@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Dao.SWC.ApiService/Dao.SWC.ApiService.csproj" />
+  <Project Path="Dao.SWC.AppHost/Dao.SWC.AppHost.csproj" />
+  <Project Path="Dao.SWC.ServiceDefaults/Dao.SWC.ServiceDefaults.csproj" />
+  <Project Path="Dao.SWC.Tests/Dao.SWC.Tests.csproj" />
+</Solution>
