@@ -7,10 +7,9 @@ import { ThemeService } from "../../services/theme.service";
  * Displays a button with icon that changes based on current theme
  */
 @Component({
-  selector: "app-theme-toggle",
-  standalone: true,
-  imports: [CommonModule],
-  template: `
+    selector: "app-theme-toggle",
+    imports: [CommonModule],
+    template: `
     <div class="theme-toggle">
       <button
         class="btn btn-link"
@@ -28,8 +27,8 @@ import { ThemeService } from "../../services/theme.service";
       </button>
     </div>
   `,
-  styles: [
-    `
+    styles: [
+        `
       .theme-toggle {
         display: inline-block;
 
@@ -53,8 +52,8 @@ import { ThemeService } from "../../services/theme.service";
         }
       }
     `,
-  ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    ],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ThemeToggleComponent {
   isDark = signal(false);

@@ -7,12 +7,11 @@ import { NotificationService } from "../../services/notification.service";
 import { SpinnerService } from "../../services/spinner.service";
 
 @Component({
-  selector: "app-home",
-  standalone: true,
-  imports: [CommonModule, ThemeToggleComponent],
-  templateUrl: "./home.component.html",
-  styleUrls: ["./home.component.scss"],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-home",
+    imports: [CommonModule, ThemeToggleComponent],
+    templateUrl: "./home.component.html",
+    styleUrls: ["./home.component.scss"],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class HomeComponent {
   constructor(

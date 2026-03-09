@@ -5,12 +5,11 @@ import { INavigationItem } from "../../models";
 import { NavigationService } from "../../services/navigation.service";
 
 @Component({
-  selector: "app-sidebar",
-  standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
-  templateUrl: "./sidebar.component.html",
-  styleUrls: ["./sidebar.component.scss"],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-sidebar",
+    imports: [CommonModule, RouterLink, RouterLinkActive],
+    templateUrl: "./sidebar.component.html",
+    styleUrls: ["./sidebar.component.scss"],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SidebarComponent {
   navigationItems: INavigationItem[] = [

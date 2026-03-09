@@ -4,12 +4,11 @@ import { INotification } from "../../models";
 import { NotificationService } from "../../services/notification.service";
 
 @Component({
-  selector: "app-notifications",
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: "./notifications.component.html",
-  styleUrls: ["./notifications.component.scss"],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-notifications",
+    imports: [CommonModule],
+    templateUrl: "./notifications.component.html",
+    styleUrls: ["./notifications.component.scss"],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NotificationsComponent {
   constructor(public notificationService: NotificationService) {}

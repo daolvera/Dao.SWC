@@ -3,12 +3,11 @@ import { ChangeDetectionStrategy, Component } from "@angular/core";
 import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
 
 @Component({
-  selector: "app-sample-modal",
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: "./sample-modal.component.html",
-  styleUrls: ["./sample-modal.component.scss"],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    selector: "app-sample-modal",
+    imports: [CommonModule],
+    templateUrl: "./sample-modal.component.html",
+    styleUrls: ["./sample-modal.component.scss"],
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SampleModalComponent {
   title: string = "Sample Modal";
