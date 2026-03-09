@@ -1,15 +1,15 @@
-import { Injectable } from "@angular/core";
-import { BehaviorSubject, Observable } from "rxjs";
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
 
 /**
  * Service to manage loading/spinner state across the application
  */
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root',
 })
 export class SpinnerService {
   private loadingSubject = new BehaviorSubject<boolean>(false);
-  private messageSubject = new BehaviorSubject<string>("");
+  private messageSubject = new BehaviorSubject<string>('');
 
   /**
    * Observable to track loading state
@@ -25,7 +25,7 @@ export class SpinnerService {
    * Show the spinner
    * @param message Optional loading message
    */
-  show(message: string = "Loading..."): void {
+  show(message: string = 'Loading...'): void {
     this.messageSubject.next(message);
     this.loadingSubject.next(true);
   }
@@ -35,7 +35,7 @@ export class SpinnerService {
    */
   hide(): void {
     this.loadingSubject.next(false);
-    this.messageSubject.next("");
+    this.messageSubject.next('');
   }
 
   /**

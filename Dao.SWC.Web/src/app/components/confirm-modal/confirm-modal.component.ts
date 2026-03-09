@@ -1,23 +1,19 @@
-import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
-import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
+import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 
 /**
  * Confirmation modal component
  * Used for yes/no, delete confirmations, etc.
  */
 @Component({
-  selector: "app-confirm-modal",
+  selector: 'app-confirm-modal',
   standalone: true,
   imports: [CommonModule],
   template: `
     <div class="modal-header">
       <h5 class="modal-title">{{ title }}</h5>
-      <button
-        type="button"
-        class="btn-close"
-        (click)="activeModal.dismiss()"
-      ></button>
+      <button type="button" class="btn-close" (click)="activeModal.dismiss()"></button>
     </div>
     <div class="modal-body">
       <p>{{ message }}</p>
@@ -26,18 +22,10 @@ import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
       }
     </div>
     <div class="modal-footer">
-      <button
-        type="button"
-        class="btn btn-secondary"
-        (click)="activeModal.dismiss()"
-      >
+      <button type="button" class="btn btn-secondary" (click)="activeModal.dismiss()">
         {{ cancelText }}
       </button>
-      <button
-        type="button"
-        [class]="'btn ' + confirmButtonClass"
-        (click)="activeModal.close(true)"
-      >
+      <button type="button" [class]="'btn ' + confirmButtonClass" (click)="activeModal.close(true)">
         {{ confirmText }}
       </button>
     </div>
@@ -45,12 +33,12 @@ import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ConfirmModalComponent {
-  @Input() title = "Confirm Action";
-  @Input() message = "Are you sure you want to proceed?";
+  @Input() title = 'Confirm Action';
+  @Input() message = 'Are you sure you want to proceed?';
   @Input() details?: string;
-  @Input() confirmText = "Confirm";
-  @Input() cancelText = "Cancel";
-  @Input() confirmButtonClass = "btn-primary";
+  @Input() confirmText = 'Confirm';
+  @Input() cancelText = 'Cancel';
+  @Input() confirmButtonClass = 'btn-primary';
 
   constructor(public activeModal: NgbActiveModal) {}
 }

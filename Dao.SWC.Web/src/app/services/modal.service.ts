@@ -1,17 +1,13 @@
-import { Injectable, Type } from "@angular/core";
-import {
-  NgbModal,
-  NgbModalOptions,
-  NgbModalRef,
-} from "@ng-bootstrap/ng-bootstrap";
-import { Observable, from } from "rxjs";
-import { IModalConfig } from "../models";
+import { Injectable, Type } from '@angular/core';
+import { NgbModal, NgbModalOptions, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
+import { Observable, from } from 'rxjs';
+import { IModalConfig } from '../models';
 
 /**
  * Service to manage modals using ng-bootstrap
  */
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root',
 })
 export class ModalService {
   constructor(private ngbModal: NgbModal) {}
@@ -33,7 +29,7 @@ export class ModalService {
     const modalRef = this.ngbModal.open(component, options);
 
     // If title is provided, set it on the component instance if it has a title property
-    if (config?.title && "title" in modalRef.componentInstance) {
+    if (config?.title && 'title' in modalRef.componentInstance) {
       (modalRef.componentInstance as any).title = config.title;
     }
 
@@ -46,10 +42,7 @@ export class ModalService {
    * @param config Modal configuration options
    * @returns Observable that emits when the modal is closed or dismissed
    */
-  openAsObservable<T>(
-    component: Type<T>,
-    config?: IModalConfig,
-  ): Observable<any> {
+  openAsObservable<T>(component: Type<T>, config?: IModalConfig): Observable<any> {
     const modalRef = this.open(component, config);
     return from(modalRef.result);
   }

@@ -13,18 +13,18 @@ public static class Constants
 
     public static class Authentication
     {
-        public const string RefreshTokenCookieKey = "swc-refresh-token";
-        public const string AccessTokenCookieKey = "swc-access-token";
-        public const string IsAuthenticatedCookieKey = "swc-is-authenticated";
+        public const string RefreshTokenCookieKey = "SwcRefreshToken";
+        public const string AccessTokenCookieKey = "SwcAccessToken";
+        public const string IsAuthenticatedCookieKey = "SwcIsAuthenticated";
     }
 
     public static class ProjectNames
     {
-        public const string ApiService = "swc-api";
-        public const string KeyVault = "swc-kv";
-        public const string AppInsights = "swc-ai";
-        public const string WebApp = "swc-app";
-        public const string Database = "swc-db";
-        public const string DatabaseProvider = "swc-postgres";
+        public const string ApiService = "SwcApi";
+        public const string KeyVault = "SwcKv";
+        public const string AppInsights = "SwcAi";
+        public const string WebApp = "SwcApp";
+        public const string Database = "SwcDb";
+        public const string DatabaseProvider = "SwcPostgres";
     }
 }

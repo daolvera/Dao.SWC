@@ -1,12 +1,12 @@
-import { Injectable } from "@angular/core";
-import { BehaviorSubject, Observable } from "rxjs";
-import { INotification } from "../models";
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { INotification } from '../models';
 
 /**
  * Service to manage toast notifications
  */
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root',
 })
 export class NotificationService {
   private notificationsSubject = new BehaviorSubject<INotification[]>([]);
@@ -14,8 +14,7 @@ export class NotificationService {
   /**
    * Observable of current notifications
    */
-  public notifications$: Observable<INotification[]> =
-    this.notificationsSubject.asObservable();
+  public notifications$: Observable<INotification[]> = this.notificationsSubject.asObservable();
 
   /**
    * Show a success notification
@@ -23,7 +22,7 @@ export class NotificationService {
    * @param duration Duration in milliseconds (0 for persistent)
    */
   success(message: string, duration: number = 5000): void {
-    this.show({ message, type: "success", duration, dismissible: true });
+    this.show({ message, type: 'success', duration, dismissible: true });
   }
 
   /**
@@ -32,7 +31,7 @@ export class NotificationService {
    * @param duration Duration in milliseconds (0 for persistent)
    */
   error(message: string, duration: number = 0): void {
-    this.show({ message, type: "error", duration, dismissible: true });
+    this.show({ message, type: 'error', duration, dismissible: true });
   }
 
   /**
@@ -41,7 +40,7 @@ export class NotificationService {
    * @param duration Duration in milliseconds (0 for persistent)
    */
   warning(message: string, duration: number = 7000): void {
-    this.show({ message, type: "warning", duration, dismissible: true });
+    this.show({ message, type: 'warning', duration, dismissible: true });
   }
 
   /**
@@ -50,7 +49,7 @@ export class NotificationService {
    * @param duration Duration in milliseconds (0 for persistent)
    */
   info(message: string, duration: number = 5000): void {
-    this.show({ message, type: "info", duration, dismissible: true });
+    this.show({ message, type: 'info', duration, dismissible: true });
   }
 
   /**
@@ -75,9 +74,7 @@ export class NotificationService {
    * @param notification The notification to dismiss
    */
   dismiss(notification: INotification): void {
-    const notifications = this.notificationsSubject.value.filter(
-      (n) => n !== notification,
-    );
+    const notifications = this.notificationsSubject.value.filter((n) => n !== notification);
     this.notificationsSubject.next(notifications);
   }
 

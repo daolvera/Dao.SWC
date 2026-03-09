@@ -1,22 +1,21 @@
-import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, signal } from "@angular/core";
-import { ThemeService } from "../../services/theme.service";
+import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ThemeService } from '../../services/theme.service';
 
 /**
  * Theme toggle component for switching between light/dark modes
  * Displays a button with icon that changes based on current theme
  */
 @Component({
-    selector: "app-theme-toggle",
-    imports: [CommonModule],
-    template: `
+  selector: 'app-theme-toggle',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
     <div class="theme-toggle">
       <button
         class="btn btn-link"
         (click)="toggleTheme()"
-        [attr.aria-label]="
-          'Switch to ' + (isDark() ? 'light' : 'dark') + ' mode'
-        "
+        [attr.aria-label]="'Switch to ' + (isDark() ? 'light' : 'dark') + ' mode'"
         title="Toggle theme"
       >
         @if (isDark()) {
@@ -27,8 +26,8 @@ import { ThemeService } from "../../services/theme.service";
       </button>
     </div>
   `,
-    styles: [
-        `
+  styles: [
+    `
       .theme-toggle {
         display: inline-block;
 
@@ -52,8 +51,8 @@ import { ThemeService } from "../../services/theme.service";
         }
       }
     `,
-    ],
-    changeDetection: ChangeDetectionStrategy.OnPush
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ThemeToggleComponent {
   isDark = signal(false);

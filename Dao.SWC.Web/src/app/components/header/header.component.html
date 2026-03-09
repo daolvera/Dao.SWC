@@ -30,18 +30,10 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" routerLink="/about" routerLinkActive="active">
-              About
-            </a>
+            <a class="nav-link" routerLink="/about" routerLinkActive="active"> About </a>
           </li>
           <li class="nav-item">
-            <a
-              class="nav-link"
-              routerLink="/utils-demo"
-              routerLinkActive="active"
-            >
-              Utils Demo
-            </a>
+            <a class="nav-link" routerLink="/utils-demo" routerLinkActive="active"> Utils Demo </a>
           </li>
           @if (authService.isAuthenticated()) {
             <li class="nav-item">
@@ -50,15 +42,11 @@
               </span>
             </li>
             <li class="nav-item">
-              <button class="btn btn-outline-danger btn-sm ms-2" (click)="logout()">
-                Logout
-              </button>
+              <button class="btn btn-outline-danger btn-sm ms-2" (click)="logout()">Logout</button>
             </li>
           } @else {
             <li class="nav-item">
-              <button class="btn btn-primary btn-sm ms-2" (click)="login()">
-                Login
-              </button>
+              <button class="btn btn-primary btn-sm ms-2" (click)="login()">Login</button>
             </li>
           }
         </ul>

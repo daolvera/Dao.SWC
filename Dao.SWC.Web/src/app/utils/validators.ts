@@ -1,4 +1,4 @@
-import { AbstractControl, ValidationErrors, ValidatorFn } from "@angular/forms";
+import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
 
 /**
  * Collection of custom form validators
@@ -48,8 +48,7 @@ export class CustomValidators {
         return null;
       }
 
-      const phoneRegex =
-        /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+      const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
       const valid = phoneRegex.test(control.value);
 
       return valid ? null : { phoneNumber: true };
@@ -78,11 +77,7 @@ export class CustomValidators {
       const isLengthValid = control.value.length >= 8;
 
       const passwordValid =
-        hasUpperCase &&
-        hasLowerCase &&
-        hasNumeric &&
-        hasSpecialChar &&
-        isLengthValid;
+        hasUpperCase && hasLowerCase && hasNumeric && hasSpecialChar && isLengthValid;
 
       return passwordValid
         ? null
@@ -135,7 +130,7 @@ export class CustomValidators {
         return null;
       }
 
-      const value = control.value.replace(/\D/g, "");
+      const value = control.value.replace(/\D/g, '');
 
       if (value.length < 13 || value.length > 19) {
         return { creditCard: true };
@@ -184,14 +179,9 @@ export class CustomValidators {
       const monthDiff = today.getMonth() - birthDate.getMonth();
 
       const actualAge =
-        monthDiff < 0 ||
-        (monthDiff === 0 && today.getDate() < birthDate.getDate())
-          ? age - 1
-          : age;
+        monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
 
-      return actualAge >= minAge
-        ? null
-        : { minAge: { required: minAge, actual: actualAge } };
+      return actualAge >= minAge ? null : { minAge: { required: minAge, actual: actualAge } };
     };
   }
 
@@ -244,7 +234,7 @@ export class CustomValidators {
         return null;
       }
 
-      const fileExtension = file.name.split(".").pop()?.toLowerCase();
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
       if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
         return {

@@ -9,9 +9,7 @@ import { environment } from '../../environments/environment';
 })
 export class AuthService {
   public userInfo = signal<UserDto | null>(null);
-  public isAuthenticated = computed(
-    () => this.getCookie('user_authenticated') === 'true',
-  );
+  public isAuthenticated = computed(() => this.getCookie('user_authenticated') === 'true');
   private http = inject(HttpClient);
   private router = inject(Router);
 

@@ -1,15 +1,15 @@
-import { CommonModule } from "@angular/common";
-import { ChangeDetectionStrategy, Component, Input } from "@angular/core";
-import { NgbActiveModal } from "@ng-bootstrap/ng-bootstrap";
+import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 
-export type AlertType = "success" | "error" | "warning" | "info";
+export type AlertType = 'success' | 'error' | 'warning' | 'info';
 
 /**
  * Alert modal component
  * Simple informational modal with single OK button
  */
 @Component({
-  selector: "app-alert-modal",
+  selector: 'app-alert-modal',
   standalone: true,
   imports: [CommonModule],
   template: `
@@ -24,9 +24,7 @@ export type AlertType = "success" | "error" | "warning" | "info";
       <button
         type="button"
         class="btn-close"
-        [class.btn-close-white]="
-          alertClass === 'danger' || alertClass === 'primary'
-        "
+        [class.btn-close-white]="alertClass === 'danger' || alertClass === 'primary'"
         (click)="activeModal.dismiss()"
       ></button>
     </div>
@@ -39,11 +37,7 @@ export type AlertType = "success" | "error" | "warning" | "info";
       }
     </div>
     <div class="modal-footer">
-      <button
-        type="button"
-        [class]="'btn btn-' + alertClass"
-        (click)="activeModal.close()"
-      >
+      <button type="button" [class]="'btn btn-' + alertClass" (click)="activeModal.close()">
         {{ buttonText }}
       </button>
     </div>
@@ -51,30 +45,30 @@ export type AlertType = "success" | "error" | "warning" | "info";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AlertModalComponent {
-  @Input() type: AlertType = "info";
-  @Input() title = "Alert";
-  @Input() message = "";
+  @Input() type: AlertType = 'info';
+  @Input() title = 'Alert';
+  @Input() message = '';
   @Input() details?: string;
-  @Input() buttonText = "OK";
+  @Input() buttonText = 'OK';
 
   constructor(public activeModal: NgbActiveModal) {}
 
   get alertClass(): string {
     const map: Record<AlertType, string> = {
-      success: "success",
-      error: "danger",
-      warning: "warning",
-      info: "info",
+      success: 'success',
+      error: 'danger',
+      warning: 'warning',
+      info: 'info',
     };
     return map[this.type];
   }
 
   get iconClass(): string {
     const map: Record<AlertType, string> = {
-      success: "bi-check-circle-fill",
-      error: "bi-exclamation-triangle-fill",
-      warning: "bi-exclamation-circle-fill",
-      info: "bi-info-circle-fill",
+      success: 'bi-check-circle-fill',
+      error: 'bi-exclamation-triangle-fill',
+      warning: 'bi-exclamation-circle-fill',
+      info: 'bi-info-circle-fill',
     };
     return map[this.type];
   }

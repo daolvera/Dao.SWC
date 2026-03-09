@@ -3,8 +3,8 @@
  */
 export interface IModalConfig {
   title?: string;
-  size?: "sm" | "lg" | "xl";
-  backdrop?: boolean | "static";
+  size?: 'sm' | 'lg' | 'xl';
+  backdrop?: boolean | 'static';
   keyboard?: boolean;
   centered?: boolean;
 }
@@ -14,7 +14,7 @@ export interface IModalConfig {
  */
 export interface INotification {
   message: string;
-  type: "success" | "error" | "warning" | "info";
+  type: 'success' | 'error' | 'warning' | 'info';
   duration?: number;
   dismissible?: boolean;
 }

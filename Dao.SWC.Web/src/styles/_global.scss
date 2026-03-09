@@ -4,7 +4,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -110,51 +111,56 @@ body {
 .dark-theme {
   background-color: #1a1a1a;
   color: #e0e0e0;
-  
+
   body {
     background-color: #1a1a1a;
     color: #e0e0e0;
   }
-  
+
   .card,
   .modal-content {
     background-color: #2d2d2d;
     border-color: #404040;
     color: #e0e0e0;
-    
+
     .card-title,
     .card-header,
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
       color: #e0e0e0 !important;
     }
-    
+
     .card-text,
     p {
       color: #c8c8c8 !important;
     }
   }
-  
+
   // Override Bootstrap's bg-light in dark mode
   .bg-light {
     background-color: #2d2d2d !important;
     color: #e0e0e0 !important;
   }
-  
+
   .text-muted {
     color: #c8c8c8 !important;
   }
-  
+
   .border {
     border-color: #404040 !important;
   }
-  
+
   .navbar,
   .header,
   .footer {
     background-color: #2d2d2d !important;
     color: #e0e0e0 !important;
     border-color: #404040;
-    
+
     .navbar-brand,
     .nav-link,
     h5,
@@ -162,24 +168,24 @@ body {
     a {
       color: #e0e0e0 !important;
     }
-    
+
     .nav-link:hover,
     a:hover {
       color: $primary !important;
     }
   }
-  
+
   .btn-outline-primary,
   .btn-outline-secondary {
     color: #e0e0e0;
     border-color: #404040;
-    
+
     &:hover {
       background-color: #2d2d2d;
       border-color: $primary;
     }
   }
-  
+
   input,
   textarea,
   select,
@@ -187,14 +193,14 @@ body {
     background-color: #2d2d2d;
     color: #e0e0e0;
     border-color: #404040;
-    
+
     &:focus {
       background-color: #2d2d2d;
       color: #e0e0e0;
       border-color: $primary;
     }
   }
-  
+
   ::-webkit-scrollbar-track {
     background: #1a1a1a;
   }
@@ -207,4 +213,3 @@ body {
     background: #555;
   }
 }
-

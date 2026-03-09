@@ -1,11 +1,11 @@
-import { Injectable } from "@angular/core";
-import { BehaviorSubject, Observable } from "rxjs";
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
 
 /**
  * Service to manage navigation state, particularly sidebar visibility
  */
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root',
 })
 export class NavigationService {
   private sidebarOpenSubject = new BehaviorSubject<boolean>(false);
@@ -14,8 +14,7 @@ export class NavigationService {
   /**
    * Observable to track sidebar open/closed state
    */
-  public sidebarOpen$: Observable<boolean> =
-    this.sidebarOpenSubject.asObservable();
+  public sidebarOpen$: Observable<boolean> = this.sidebarOpenSubject.asObservable();
 
   /**
    * Observable to track mobile viewport state
@@ -24,8 +23,8 @@ export class NavigationService {
 
   constructor() {
     // Listen for window resize events
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", () => {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', () => {
         this.isMobileSubject.next(this.checkMobile());
 
         // Auto-close sidebar on desktop
@@ -68,7 +67,7 @@ export class NavigationService {
    * Check if current viewport is mobile
    */
   private checkMobile(): boolean {
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
       return false;
     }
     return window.innerWidth < 992; // Bootstrap's lg breakpoint

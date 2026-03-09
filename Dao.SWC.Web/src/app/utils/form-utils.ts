@@ -23,7 +23,7 @@ export class FormUtils {
       const control = form.get(key);
       control?.markAsTouched();
 
-      if (control && typeof control === "object" && "controls" in control) {
+      if (control && typeof control === 'object' && 'controls' in control) {
         this.markAllAsTouched(control);
       }
     });
@@ -53,7 +53,7 @@ export class FormUtils {
         });
       }
 
-      if (control && typeof control === "object" && "controls" in control) {
+      if (control && typeof control === 'object' && 'controls' in control) {
         const nestedErrors = this.getAllErrors(control);
         Object.keys(nestedErrors).forEach((nestedKey) => {
           errors[`${key}.${nestedKey}`] = nestedErrors[nestedKey];
@@ -72,11 +72,7 @@ export class FormUtils {
    * @param errorValue - Error value object
    * @returns Formatted error message
    */
-  static getErrorMessage(
-    fieldName: string,
-    errorKey: string,
-    errorValue: any,
-  ): string {
+  static getErrorMessage(fieldName: string, errorKey: string, errorValue: any): string {
     const fieldLabel = this.formatFieldName(fieldName);
 
     const errorMessages: {
@@ -84,27 +80,21 @@ export class FormUtils {
     } = {
       required: (field) => `${field} is required`,
       email: (field) => `${field} must be a valid email address`,
-      minlength: (field, value) =>
-        `${field} must be at least ${value.requiredLength} characters`,
-      maxlength: (field, value) =>
-        `${field} must not exceed ${value.requiredLength} characters`,
+      minlength: (field, value) => `${field} must be at least ${value.requiredLength} characters`,
+      maxlength: (field, value) => `${field} must not exceed ${value.requiredLength} characters`,
       min: (field, value) => `${field} must be at least ${value.min}`,
       max: (field, value) => `${field} must not exceed ${value.max}`,
       pattern: (field) => `${field} format is invalid`,
-      matchesField: (field, value) =>
-        `${field} must match ${this.formatFieldName(value.field)}`,
+      matchesField: (field, value) => `${field} must match ${this.formatFieldName(value.field)}`,
       phoneNumber: (field) => `${field} must be a valid phone number`,
       strongPassword: (field) =>
         `${field} must contain uppercase, lowercase, number, and special character`,
       url: (field) => `${field} must be a valid URL`,
       creditCard: (field) => `${field} must be a valid credit card number`,
       minAge: (field, value) => `Minimum age is ${value.required} years`,
-      fileSize: (field, value) =>
-        `File size must not exceed ${value.maxSize}MB`,
-      fileExtension: (field, value) =>
-        `Allowed file types: ${value.allowed.join(", ")}`,
-      range: (field, value) =>
-        `${field} must be between ${value.min} and ${value.max}`,
+      fileSize: (field, value) => `File size must not exceed ${value.maxSize}MB`,
+      fileExtension: (field, value) => `Allowed file types: ${value.allowed.join(', ')}`,
+      range: (field, value) => `${field} must be between ${value.min} and ${value.max}`,
       alphanumeric: (field) => `${field} must contain only letters and numbers`,
       noWhitespace: (field) => `${field} cannot contain spaces`,
     };
@@ -125,8 +115,8 @@ export class FormUtils {
    */
   private static formatFieldName(fieldName: string): string {
     return fieldName
-      .replace(/([A-Z])/g, " $1")
-      .replace(/_/g, " ")
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
       .replace(/^./, (str) => str.toUpperCase())
       .trim();
   }

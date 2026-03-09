@@ -1,6 +1,6 @@
-import { effect, Injectable, signal } from "@angular/core";
+import { effect, Injectable, signal } from '@angular/core';
 
-export type Theme = "light" | "dark" | "auto";
+export type Theme = 'light' | 'dark' | 'auto';
 
 /**
  * Service for managing application theme (light/dark mode)
@@ -23,26 +23,26 @@ export type Theme = "light" | "dark" | "auto";
  * ```
  */
 @Injectable({
-  providedIn: "root",
+  providedIn: 'root',
 })
 export class ThemeService {
-  private readonly STORAGE_KEY = "app-theme";
-  private readonly DARK_CLASS = "dark-theme";
+  private readonly STORAGE_KEY = 'app-theme';
+  private readonly DARK_CLASS = 'dark-theme';
 
   // Signal-based reactive theme
   public theme = signal<Theme>(this.getStoredTheme());
 
   // Media query for system preference
-  private prefersDarkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+  private prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
   constructor() {
     // Apply initial theme
     this.applyTheme(this.theme());
 
     // Watch for system preference changes when in auto mode
-    this.prefersDarkQuery.addEventListener("change", (e) => {
-      if (this.theme() === "auto") {
-        this.applyTheme("auto");
+    this.prefersDarkQuery.addEventListener('change', (e) => {
+      if (this.theme() === 'auto') {
+        this.applyTheme('auto');
       }
     });
 
@@ -68,10 +68,8 @@ export class ThemeService {
    */
   public toggleTheme(): void {
     const current = this.theme();
-    const isDark =
-      current === "dark" ||
-      (current === "auto" && this.prefersDarkQuery.matches);
-    this.theme.set(isDark ? "light" : "dark");
+    const isDark = current === 'dark' || (current === 'auto' && this.prefersDarkQuery.matches);
+    this.theme.set(isDark ? 'light' : 'dark');
   }
 
   /**
@@ -79,19 +77,16 @@ export class ThemeService {
    */
   public isDarkMode(): boolean {
     const current = this.theme();
-    return (
-      current === "dark" ||
-      (current === "auto" && this.prefersDarkQuery.matches)
-    );
+    return current === 'dark' || (current === 'auto' && this.prefersDarkQuery.matches);
   }
 
   /**
    * Get the effective theme (resolves 'auto' to 'light' or 'dark')
    */
-  public getEffectiveTheme(): "light" | "dark" {
+  public getEffectiveTheme(): 'light' | 'dark' {
     const current = this.theme();
-    if (current === "auto") {
-      return this.prefersDarkQuery.matches ? "dark" : "light";
+    if (current === 'auto') {
+      return this.prefersDarkQuery.matches ? 'dark' : 'light';
     }
     return current;
   }
@@ -100,15 +95,14 @@ export class ThemeService {
    * Apply theme to document
    */
   private applyTheme(theme: Theme): void {
-    const isDark =
-      theme === "dark" || (theme === "auto" && this.prefersDarkQuery.matches);
+    const isDark = theme === 'dark' || (theme === 'auto' && this.prefersDarkQuery.matches);
 
     if (isDark) {
       document.documentElement.classList.add(this.DARK_CLASS);
-      document.documentElement.setAttribute("data-bs-theme", "dark");
+      document.documentElement.setAttribute('data-bs-theme', 'dark');
     } else {
       document.documentElement.classList.remove(this.DARK_CLASS);
-      document.documentElement.setAttribute("data-bs-theme", "light");
+      document.documentElement.setAttribute('data-bs-theme', 'light');
     }
   }
 
@@ -118,13 +112,13 @@ export class ThemeService {
   private getStoredTheme(): Theme {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (stored === "light" || stored === "dark" || stored === "auto") {
+      if (stored === 'light' || stored === 'dark' || stored === 'auto') {
         return stored;
       }
     } catch (e) {
-      console.warn("Failed to read theme from localStorage", e);
+      console.warn('Failed to read theme from localStorage', e);
     }
-    return "auto"; // Default to system preference
+    return 'auto'; // Default to system preference
   }
 
   /**
@@ -134,7 +128,7 @@ export class ThemeService {
     try {
       localStorage.setItem(this.STORAGE_KEY, theme);
     } catch (e) {
-      console.warn("Failed to save theme to localStorage", e);
+      console.warn('Failed to save theme to localStorage', e);
     }
   }
 }
