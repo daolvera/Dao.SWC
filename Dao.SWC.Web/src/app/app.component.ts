@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { LayoutComponent } from './components/layout/layout.component';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -15,5 +16,11 @@ import { LayoutComponent } from './components/layout/layout.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent {
-  title = 'Bootstrap Angular App';
+  private authService = inject(AuthService);
+
+  constructor() {
+    if (this.authService.isAuthenticated()) {
+      this.authService.loadUserInfo();
+    }
+  }
 }

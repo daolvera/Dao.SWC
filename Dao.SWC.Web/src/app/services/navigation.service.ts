@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { INavigationItem } from '../models';
 
 /**
  * Service to manage navigation state, particularly sidebar visibility
@@ -8,6 +9,15 @@ import { BehaviorSubject, Observable } from 'rxjs';
   providedIn: 'root',
 })
 export class NavigationService {
+  /**
+   * Shared navigation items - single source of truth
+   */
+  readonly navigationItems: INavigationItem[] = [
+    { label: 'Home', route: '/', icon: 'house' },
+    { label: 'Play Now', route: '/play', icon: 'controller', requiresAuth: true },
+    { label: 'Decks', route: '/decks', icon: 'collection', requiresAuth: true },
+  ];
+
   private sidebarOpenSubject = new BehaviorSubject<boolean>(false);
   private isMobileSubject = new BehaviorSubject<boolean>(this.checkMobile());
 

@@ -10,15 +10,20 @@ var insights = builder.AddAzureApplicationInsights(Constants.ProjectNames.AppIns
 
 var swcDb = postgres.AddDatabase(Constants.ProjectNames.Database);
 
+var migrations = builder.AddProject<Projects.Dao_SWC_MigrationService>(Constants.ProjectNames.MigrationService)
+    .WithReference(swcDb)
+    .WaitFor(swcDb);
+
 var apiService = builder.AddProject<Projects.Dao_SWC_ApiService>(Constants.ProjectNames.ApiService)
     .WithExternalHttpEndpoints() // Required for OAuth callbacks
+    .WaitFor(migrations)
     .WithReference(swcDb)
     .WithReference(insights)
     .WithReference(keyVault)
     .WithHttpHealthCheck("/health");
 
 var webApp = builder
-    .AddJavaScriptApp(Constants.ProjectNames.WebApp, Constants.WebAppConfiguration.AppFolder, Constants.WebAppConfiguration.StartCommandName)
+    .AddJavaScriptApp(Constants.ProjectNames.WebApp, Constants.WebAppConfiguration.AppFolder)
     .WithReference(apiService)
     .WaitFor(apiService)
     .WithHttpEndpoint(targetPort: 3000, env: "PORT")

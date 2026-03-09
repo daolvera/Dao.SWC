@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { INavigationItem } from '../../models';
+import { AuthService } from '../../services/auth.service';
 import { NavigationService } from '../../services/navigation.service';
 
 @Component({
@@ -13,15 +13,28 @@ import { NavigationService } from '../../services/navigation.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SidebarComponent {
-  navigationItems: INavigationItem[] = [
-    { label: 'Home', route: '/', icon: 'house' },
-    { label: 'About', route: '/about', icon: 'info-circle' },
-    { label: 'Utils Demo', route: '/utils-demo', icon: 'tools' },
-  ];
+  public navigationService = inject(NavigationService);
+  public authService = inject(AuthService);
 
-  constructor(public navigationService: NavigationService) {}
+  /** Filtered navigation items based on authentication state */
+  navigationItems = computed(() => {
+    const isAuthenticated = this.authService.isAuthenticated();
+    return this.navigationService.navigationItems.filter(
+      (item) => !item.requiresAuth || isAuthenticated,
+    );
+  });
 
   closeSidebar(): void {
     this.navigationService.closeSidebar();
+  }
+
+  login(): void {
+    this.authService.login();
+    this.closeSidebar();
+  }
+
+  logout(): void {
+    this.authService.logout();
+    this.closeSidebar();
   }
 }

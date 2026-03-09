@@ -3,7 +3,7 @@
     <div class="container-fluid">
       <!-- Brand -->
       <a class="navbar-brand" routerLink="/">
-        <strong>Bootstrap Angular</strong>
+        <strong>Star Wars Cards Online Battler</strong>
       </a>
 
       <!-- Mobile Menu Button -->
@@ -19,22 +19,16 @@
       <!-- Desktop Navigation -->
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item">
-            <a
-              class="nav-link"
-              routerLink="/"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: true }"
-            >
-              Home
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" routerLink="/about" routerLinkActive="active"> About </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" routerLink="/utils-demo" routerLinkActive="active"> Utils Demo </a>
-          </li>
+          @for (item of navigationService.navigationItems; track item.route) {
+            @if (!item.requiresAuth || authService.isAuthenticated()) {
+              <li class="nav-item">
+                <a class="nav-link" [routerLink]="item.route" routerLinkActive="active"
+                   [routerLinkActiveOptions]="{ exact: item.route === '/' }">
+                  {{ item.label }}
+                </a>
+              </li>
+            }
+          }
           @if (authService.isAuthenticated()) {
             <li class="nav-item">
               <span class="nav-link text-muted">
@@ -42,13 +36,16 @@
               </span>
             </li>
             <li class="nav-item">
-              <button class="btn btn-outline-danger btn-sm ms-2" (click)="logout()">Logout</button>
+              <button class="btn btn-outline-danger ms-3" (click)="logout()">Logout</button>
             </li>
           } @else {
             <li class="nav-item">
-              <button class="btn btn-primary btn-sm ms-2" (click)="login()">Login</button>
+              <button class="btn btn-primary ms-3" (click)="login()">Login</button>
             </li>
           }
+          <li class="nav-item ms-3">
+            <app-theme-toggle></app-theme-toggle>
+          </li>
         </ul>
       </div>
     </div>

@@ -29,6 +29,8 @@
   z-index: 1050;
   transition: left 0.3s ease;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 
   &.show {
     left: 0;

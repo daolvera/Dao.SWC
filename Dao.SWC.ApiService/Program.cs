@@ -1,8 +1,13 @@
 using Dao.SWC.ApiService.Extensions;
+using Dao.SWC.ApiService.Hubs;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
+using Dao.SWC.Core.Decks;
+using Dao.SWC.Core.GameRoom;
 using Dao.SWC.Services.Authentication;
 using Dao.SWC.Services.Data;
+using Dao.SWC.Services.Decks;
+using Dao.SWC.Services.GameRoom;
 using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,7 +24,12 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddLoginInRateLimiter();
 
-builder.Services.AddSpaCors(builder.Configuration[Constants.AppUrlConfigurationKey] ?? throw new InvalidOperationException($"{Constants.AppUrlConfigurationKey} is not configured"));
+builder.Services.AddSpaCors(
+    builder.Configuration[Constants.AppUrlConfigurationKey]
+        ?? throw new InvalidOperationException(
+            $"{Constants.AppUrlConfigurationKey} is not configured"
+        )
+);
 
 builder.Configuration.AddAzureKeyVaultSecrets(Constants.ProjectNames.KeyVault);
 
@@ -31,6 +41,21 @@ builder.Services.AddRouting(options =>
 });
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IAppUserRepository, AppUserRepository>();
+builder.Services.AddScoped<IAppUserService, AppUserService>();
+
+// Deck and Card services
+builder.Services.AddScoped<IDeckService, DeckService>();
+builder.Services.AddScoped<IDeckValidationService, DeckValidationService>();
+builder.Services.AddScoped<ICardService, CardService>();
+// Configure authentication
+builder.AddGoogleAuthentication();
+
+// Configure SignalR
+builder.Services.AddSignalR();
+
+// Game room storage (singleton for in-memory state)
+builder.Services.AddSingleton<IGameRoomStorage, GameRoomStorage>();
+builder.Services.AddScoped<IGameRoomService, GameRoomService>();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -75,7 +100,9 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = Dat
 
 app.MapControllers();
 
-app.MapDefaultEndpoints();
+// Map SignalR hubs
+app.MapHub<GameHub>("/gamehub");
 
+app.MapDefaultEndpoints();
 
 app.Run();
