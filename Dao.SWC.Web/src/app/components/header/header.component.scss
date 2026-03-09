@@ -1,0 +1,29 @@
+.header {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #f8f9fa;
+  
+  .navbar {
+    background-color: inherit;
+  }
+  
+  .navbar-brand {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: inherit;
+  }
+
+  .nav-link {
+    margin: 0 0.5rem;
+    transition: color 0.3s ease;
+    color: inherit;
+
+    &:hover {
+      color: var(--bs-primary);
+    }
+
+    &.active {
+      color: var(--bs-primary);
+      font-weight: 500;
+    }
+  }
+}

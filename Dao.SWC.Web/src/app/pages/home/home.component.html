@@ -1,0 +1,131 @@
+<div class="home">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="mb-2">Welcome to Bootstrap Angular</h1>
+          <p class="lead mb-0">
+            A modern Angular application with Bootstrap 5 integration, pre-built
+            services, and responsive components.
+          </p>
+        </div>
+        <div>
+          <app-theme-toggle></app-theme-toggle>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature Cards -->
+  <div class="row mt-5">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-bootstrap text-primary me-2"></i>
+            Bootstrap 5
+          </h5>
+          <p class="card-text">
+            Fully integrated Bootstrap 5 with customizable SCSS variables and
+            modern components.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-gear text-success me-2"></i>
+            Pre-built Services
+          </h5>
+          <p class="card-text">
+            Ready-to-use services for spinner, modal, navigation, and
+            notifications.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-phone text-info me-2"></i>
+            Responsive Design
+          </h5>
+          <p class="card-text">
+            Mobile-first responsive design with sidebar navigation and adaptive
+            layouts.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Demo Section -->
+  <div class="row mt-5">
+    <div class="col-12">
+      <h2 class="mb-4">Component Demos</h2>
+    </div>
+
+    <!-- Spinner Demo -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Spinner Service</h5>
+          <p class="card-text">
+            Test the loading spinner with a simulated operation.
+          </p>
+          <button class="btn btn-primary" (click)="showSpinner()">
+            Show Spinner
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Demo -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Modal Service</h5>
+          <p class="card-text">Open a sample modal dialog.</p>
+          <button class="btn btn-success" (click)="openModal()">
+            Open Modal
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Demo -->
+    <div class="col-12 mb-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Notification Service</h5>
+          <p class="card-text">Display different types of notifications.</p>
+          <div class="btn-group" role="group">
+            <button
+              class="btn btn-success"
+              (click)="showNotification('success')"
+            >
+              Success
+            </button>
+            <button class="btn btn-danger" (click)="showNotification('error')">
+              Error
+            </button>
+            <button
+              class="btn btn-warning"
+              (click)="showNotification('warning')"
+            >
+              Warning
+            </button>
+            <button class="btn btn-info" (click)="showNotification('info')">
+              Info
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

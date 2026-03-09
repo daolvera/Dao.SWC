@@ -1,0 +1,20 @@
+<div class="notifications-container">
+  <div
+    class="alert fade-in"
+    [ngClass]="getAlertClass(notification.type)"
+    *ngFor="let notification of notificationService.notifications$ | async"
+    role="alert"
+  >
+    <div class="d-flex align-items-center">
+      <i class="bi bi-{{ getIcon(notification.type) }} me-2"></i>
+      <span class="flex-grow-1">{{ notification.message }}</span>
+      <button
+        type="button"
+        class="btn-close ms-2"
+        *ngIf="notification.dismissible"
+        aria-label="Close"
+        (click)="dismiss(notification)"
+      ></button>
+    </div>
+  </div>
+</div>

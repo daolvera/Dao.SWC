@@ -1,6 +1,13 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Dao.SWC.Tests/Dao.SWC.Tests.csproj" />
+  </Folder>
   <Project Path="Dao.SWC.ApiService/Dao.SWC.ApiService.csproj" />
   <Project Path="Dao.SWC.AppHost/Dao.SWC.AppHost.csproj" />
+  <Project Path="Dao.SWC.Core/Dao.SWC.Core.csproj" Id="e9a7e79c-eb99-412a-9734-a90d49d72c87" />
   <Project Path="Dao.SWC.ServiceDefaults/Dao.SWC.ServiceDefaults.csproj" />
-  <Project Path="Dao.SWC.Tests/Dao.SWC.Tests.csproj" />
+  <Project Path="Dao.SWC.Services/Dao.SWC.Services.csproj" Id="706a5155-c8af-48c6-86d3-35b16b86e7f5" />
 </Solution>

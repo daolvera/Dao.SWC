@@ -1,0 +1,25 @@
+.notifications-container {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 1060;
+  max-width: 400px;
+  width: 100%;
+
+  .alert {
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+    i {
+      font-size: 1.25rem;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .notifications-container {
+    left: 20px;
+    right: 20px;
+    max-width: calc(100% - 40px);
+  }
+}

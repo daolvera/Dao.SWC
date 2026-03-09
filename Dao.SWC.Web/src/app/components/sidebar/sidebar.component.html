@@ -1,0 +1,36 @@
+<!-- Backdrop -->
+<div
+  class="sidebar-backdrop"
+  [class.show]="navigationService.sidebarOpen$ | async"
+  (click)="closeSidebar()"
+></div>
+
+<!-- Sidebar -->
+<aside class="sidebar" [class.show]="navigationService.sidebarOpen$ | async">
+  <div class="sidebar-header">
+    <h5 class="mb-0">Menu</h5>
+    <button
+      type="button"
+      class="btn-close"
+      aria-label="Close"
+      (click)="closeSidebar()"
+    ></button>
+  </div>
+
+  <nav class="sidebar-nav">
+    <ul class="nav flex-column">
+      <li class="nav-item" *ngFor="let item of navigationItems">
+        <a
+          class="nav-link"
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.route === '/' }"
+          (click)="closeSidebar()"
+        >
+          <i class="bi bi-{{ item.icon }} me-2" *ngIf="item.icon"></i>
+          {{ item.label }}
+        </a>
+      </li>
+    </ul>
+  </nav>
+</aside>

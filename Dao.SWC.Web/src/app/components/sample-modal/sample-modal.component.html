@@ -1,0 +1,33 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button
+    type="button"
+    class="btn-close"
+    aria-label="Close"
+    (click)="cancel()"
+  ></button>
+</div>
+
+<div class="modal-body">
+  <p>This is a sample modal component using ng-bootstrap.</p>
+  <p>
+    You can customize this modal by passing configuration options to the
+    ModalService. The modal supports different sizes (sm, lg, xl), backdrop
+    options, and keyboard controls.
+  </p>
+
+  <div class="alert alert-info" role="alert">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>Tip:</strong> You can pass data to the modal through the component
+    instance.
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancel()">
+    Cancel
+  </button>
+  <button type="button" class="btn btn-primary" (click)="confirm()">
+    Confirm
+  </button>
+</div>

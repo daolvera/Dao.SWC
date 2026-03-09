@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -10,6 +10,17 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dao.SWC.ApiService\Dao.SWC.ApiService.csproj" />
+		<ProjectReference Include="..\Dao.SWC.Core\Dao.SWC.Core.csproj" >
+			<IsAspireProjectResource>false</IsAspireProjectResource>
+		</ProjectReference>
   </ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Aspire.Hosting.AppHost" Version="13.1.2" />
+		<PackageReference Include="Aspire.Hosting.Azure.ApplicationInsights" Version="13.1.2" />
+		<PackageReference Include="Aspire.Hosting.Azure.KeyVault" Version="13.1.2" />
+		<PackageReference Include="Aspire.Hosting.JavaScript" Version="13.1.2" />
+		<PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.1.2" />
+	</ItemGroup>
 
 </Project>
