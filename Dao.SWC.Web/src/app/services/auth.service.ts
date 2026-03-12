@@ -1,8 +1,13 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { UserDto } from '../models/dtos/user.dto';
 import { environment } from '../../environments/environment';
+
+export const Roles = {
+  Admin: 'Admin',
+  CardEditor: 'CardEditor',
+} as const;
 
 @Injectable({
   providedIn: 'root',
@@ -12,6 +17,14 @@ export class AuthService {
   public isAuthenticated = computed(() => this.getCookie('user_authenticated') === 'true');
   private http = inject(HttpClient);
   private router = inject(Router);
+
+  public hasRole(role: string): boolean {
+    const user = this.userInfo();
+    return user?.roles?.includes(role) ?? false;
+  }
+
+  public isAdmin = computed(() => this.hasRole(Roles.Admin));
+  public isCardEditor = computed(() => this.hasRole(Roles.CardEditor) || this.hasRole(Roles.Admin));
 
   public loadUserInfo() {
     this.http.get<UserDto>(environment.apiUrl + 'Auth/me').subscribe((user) => {
@@ -32,7 +45,9 @@ export class AuthService {
   }
 
   public refreshToken() {
-    return this.http.get(environment.apiUrl + 'Auth/refresh');
+    // Skip spinner to avoid double-counting during auth interceptor retry flows
+    const headers = new HttpHeaders().set('X-Skip-Spinner', 'true');
+    return this.http.get(environment.apiUrl + 'Auth/refresh', { headers });
   }
 
   private getCookie(name: string): string | null {

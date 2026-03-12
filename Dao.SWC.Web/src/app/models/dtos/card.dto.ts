@@ -28,3 +28,14 @@ export interface CardDto {
   imageUrl: string | null;
   cardText: string | null;
 }
+
+export interface CardUpdateDto {
+  id: number;
+  name: string;
+  type: CardType;
+  alignment: Alignment;
+  arena: Arena | null;
+  version: string | null;
+  imageUrl: string | null;
+  cardText: string | null;
+}

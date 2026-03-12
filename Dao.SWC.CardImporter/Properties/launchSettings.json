@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+    "profiles": {
+        "Dao.SWC.CardImporter": {
+            "commandName": "Project",
+            "dotnetRunMessages": true,
+            "commandLineArgs": "--verbose",
+            "environmentVariables": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        },
+        "Dao.SWC.CardImporter (Dry Run)": {
+            "commandName": "Project",
+            "dotnetRunMessages": true,
+            "commandLineArgs": "--dry-run --verbose",
+            "environmentVariables": {
+                "DOTNET_ENVIRONMENT": "Development"
+            }
+        }
+    }
+}

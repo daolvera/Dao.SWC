@@ -4,6 +4,7 @@ public enum RoomType
 {
     OneVsOne = 1,
     TwoVsTwo = 2,
+    OneVsTwo = 3,
 }
 
 public enum GameState

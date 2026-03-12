@@ -16,12 +16,14 @@ export class SidebarComponent {
   public navigationService = inject(NavigationService);
   public authService = inject(AuthService);
 
-  /** Filtered navigation items based on authentication state */
+  /** Filtered navigation items based on authentication and role state */
   navigationItems = computed(() => {
     const isAuthenticated = this.authService.isAuthenticated();
-    return this.navigationService.navigationItems.filter(
-      (item) => !item.requiresAuth || isAuthenticated,
-    );
+    return this.navigationService.navigationItems.filter((item) => {
+      if (item.requiresAuth && !isAuthenticated) return false;
+      if (item.requiresRole && !this.authService.hasRole(item.requiresRole)) return false;
+      return true;
+    });
   });
 
   closeSidebar(): void {

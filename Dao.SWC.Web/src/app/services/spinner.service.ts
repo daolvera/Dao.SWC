@@ -3,6 +3,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 
 /**
  * Service to manage loading/spinner state across the application
+ * Uses reference counting to handle concurrent requests
  */
 @Injectable({
   providedIn: 'root',
@@ -10,6 +11,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 export class SpinnerService {
   private loadingSubject = new BehaviorSubject<boolean>(false);
   private messageSubject = new BehaviorSubject<string>('');
+  private requestCount = 0;
 
   /**
    * Observable to track loading state
@@ -22,27 +24,35 @@ export class SpinnerService {
   public message$: Observable<string> = this.messageSubject.asObservable();
 
   /**
-   * Show the spinner
+   * Show the spinner (increments request counter)
    * @param message Optional loading message
    */
   show(message: string = 'Loading...'): void {
-    this.messageSubject.next(message);
-    this.loadingSubject.next(true);
+    this.requestCount++;
+    if (this.requestCount === 1) {
+      this.messageSubject.next(message);
+      this.loadingSubject.next(true);
+    }
   }
 
   /**
-   * Hide the spinner
+   * Hide the spinner (decrements request counter, only hides when all requests complete)
    */
   hide(): void {
-    this.loadingSubject.next(false);
-    this.messageSubject.next('');
+    this.requestCount = Math.max(0, this.requestCount - 1);
+    if (this.requestCount === 0) {
+      this.loadingSubject.next(false);
+      this.messageSubject.next('');
+    }
   }
 
   /**
-   * Toggle the spinner state
+   * Force hide the spinner (resets counter)
    */
-  toggle(): void {
-    this.loadingSubject.next(!this.loadingSubject.value);
+  forceHide(): void {
+    this.requestCount = 0;
+    this.loadingSubject.next(false);
+    this.messageSubject.next('');
   }
 
   /**

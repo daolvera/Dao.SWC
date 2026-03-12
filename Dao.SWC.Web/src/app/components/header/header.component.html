@@ -20,10 +20,14 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
           @for (item of navigationService.navigationItems; track item.route) {
-            @if (!item.requiresAuth || authService.isAuthenticated()) {
+            @if (shouldShowNavItem(item)) {
               <li class="nav-item">
-                <a class="nav-link" [routerLink]="item.route" routerLinkActive="active"
-                   [routerLinkActiveOptions]="{ exact: item.route === '/' }">
+                <a
+                  class="nav-link"
+                  [routerLink]="item.route"
+                  routerLinkActive="active"
+                  [routerLinkActiveOptions]="{ exact: item.route === '/' }"
+                >
                   {{ item.label }}
                 </a>
               </li>

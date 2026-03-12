@@ -64,6 +64,21 @@ public interface IGameRoomService
     Task<CardInstance?> DiscardCardAsync(string roomCode, string userId, Guid cardInstanceId);
 
     /// <summary>
+    /// Return a card to hand (from play area or discard).
+    /// </summary>
+    Task<CardInstance?> ReturnToHandAsync(string roomCode, string userId, Guid cardInstanceId);
+
+    /// <summary>
+    /// Toggle tap/untap state of a card.
+    /// </summary>
+    Task<CardInstance?> ToggleTapAsync(string roomCode, string userId, Guid cardInstanceId);
+
+    /// <summary>
+    /// Shuffle the player's deck.
+    /// </summary>
+    Task<bool> ShuffleDeckAsync(string roomCode, string userId);
+
+    /// <summary>
     /// Roll dice.
     /// </summary>
     Task<DiceRollResult> RollDiceAsync(

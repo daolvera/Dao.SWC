@@ -27,6 +27,7 @@ export interface INavigationItem {
   route: string;
   icon?: string;
   requiresAuth?: boolean;
+  requiresRole?: string;
   children?: INavigationItem[];
 }
 

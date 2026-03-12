@@ -1,6 +1,7 @@
 export enum RoomType {
   OneVOne = 0,
   TwoVTwo = 1,
+  OneVTwo = 2,
 }
 
 export enum GameState {

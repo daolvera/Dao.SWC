@@ -43,3 +43,14 @@ public record UpdateDeckDto(
 );
 
 public record UpdateDeckCardDto(int CardId, int Quantity);
+
+public record CardUpdateDto(
+    int Id,
+    string Name,
+    CardType Type,
+    Alignment Alignment,
+    Arena? Arena,
+    string? Version,
+    string? ImageUrl,
+    string? CardText
+);

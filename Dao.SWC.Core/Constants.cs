@@ -19,12 +19,28 @@ public static class Constants
 
     public static class ProjectNames
     {
-        public const string ApiService = "SwcApi";
-        public const string KeyVault = "SwcKv";
-        public const string AppInsights = "SwcAi";
-        public const string WebApp = "SwcApp";
-        public const string Database = "SwcDb";
-        public const string DatabaseProvider = "SwcPostgres";
-        public const string MigrationService = "SwcMigrationService";
+        public const string ApiService = "swcapi";
+        public const string KeyVault = "swckv";
+        public const string AppInsights = "swcai";
+        public const string WebApp = "swcapp";
+        public const string Database = "swcdb";
+        public const string DatabaseProvider = "swcpostgres";
+        public const string MigrationService = "swcmigrationservice";
+        public const string BlobStorage = "swcstorage";
+        public const string BlobContainer = "swcblobs";
+        public const string CardImporter = "swccardimporter";
+        public const string OpenAi = "swcopenai";
+    }
+
+    public static class ImportOptions
+    {
+        public const int DefaultDelayMs = 500;
+        public const string CardsContainerName = "cards";
+    }
+
+    public static class Roles
+    {
+        public const string Admin = "Admin";
+        public const string CardEditor = "CardEditor";
     }
 }

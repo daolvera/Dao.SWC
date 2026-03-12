@@ -16,6 +16,13 @@ export class NavigationService {
     { label: 'Home', route: '/', icon: 'house' },
     { label: 'Play Now', route: '/play', icon: 'controller', requiresAuth: true },
     { label: 'Decks', route: '/decks', icon: 'collection', requiresAuth: true },
+    {
+      label: 'Card Management',
+      route: '/admin/cards',
+      icon: 'card-list',
+      requiresAuth: true,
+      requiresRole: 'CardEditor',
+    },
   ];
 
   private sidebarOpenSubject = new BehaviorSubject<boolean>(false);

@@ -1,5 +1,5 @@
-const target = process.env["service__SwcApi__https_0"] ||
-  process.env["service__SwcApi__http_0"] ||
+const target = process.env["service__swcapi__https_0"] ||
+  process.env["service__swcapi__http_0"] ||
   "https://localhost:7493"; // Fallback for standalone dev
 
 module.exports = {

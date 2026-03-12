@@ -2,18 +2,19 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   OnInit,
   signal,
+  ViewChild,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { Alignment, Arena, CardDto, CardType } from '../../models/dtos/card.dto';
-import { DeckCardDto, DeckDto, DeckValidationResult } from '../../models/dtos/deck.dto';
+import { DeckDto, DeckValidationResult } from '../../models/dtos/deck.dto';
 import { CardService } from '../../services/card.service';
 import { DeckService } from '../../services/deck.service';
+import { CardFilter } from '../../models/filters/card-filter';
+import { CardFiltersComponent } from '../../components/card-filters/card-filters.component';
 
 interface DeckCardEntry {
   card: CardDto;
@@ -69,42 +70,17 @@ interface DeckCardEntry {
             </div>
             <div class="card-body">
               <!-- Search and Filters -->
-              <div class="row g-2 mb-3">
-                <div class="col-12">
-                  <input
-                    type="text"
-                    class="form-control"
-                    placeholder="Search cards..."
-                    [formControl]="searchControl"
-                  />
-                </div>
-                <div class="col-6">
-                  <select class="form-select" [formControl]="typeFilter">
-                    <option [value]="null">All Types</option>
-                    <option [value]="CardType.Unit">Unit</option>
-                    <option [value]="CardType.Location">Location</option>
-                    <option [value]="CardType.Equipment">Equipment</option>
-                    <option [value]="CardType.Mission">Mission</option>
-                    <option [value]="CardType.Battle">Battle</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <select class="form-select" [formControl]="arenaFilter">
-                    <option [value]="null">All Arenas</option>
-                    <option [value]="Arena.Space">Space</option>
-                    <option [value]="Arena.Ground">Ground</option>
-                    <option [value]="Arena.Character">Character</option>
-                  </select>
-                </div>
+              <div class="mb-3">
+                <app-card-filters
+                  [showAlignmentFilter]="false"
+                  [fixedAlignment]="deck()?.alignment"
+                  (filterChange)="onFilterChange($event)"
+                />
               </div>
 
               <!-- Card List -->
               <div class="card-list" style="max-height: 500px; overflow-y: auto;">
-                @if (loadingCards()) {
-                  <div class="text-center py-3">
-                    <div class="spinner-border spinner-border-sm"></div>
-                  </div>
-                } @else if (availableCards().length === 0) {
+                 @if (availableCards().length === 0) {
                   <p class="text-muted text-center py-3">No cards found</p>
                 } @else {
                   @for (card of availableCards(); track card.id) {
@@ -148,6 +124,25 @@ interface DeckCardEntry {
                   }
                 }
               </div>
+
+              <!-- Pagination -->
+              @if (totalPages() > 1) {
+                <div class="d-flex flex-column align-items-center mt-3">
+                  <ngb-pagination
+                    [collectionSize]="totalCount()"
+                    [pageSize]="pageSize"
+                    [page]="currentPage()"
+                    (pageChange)="goToPage($event)"
+                    [maxSize]="5"
+                    [rotate]="true"
+                    [boundaryLinks]="true"
+                    size="sm"
+                  />
+                  <small class="text-muted mt-1">
+                    Page {{ currentPage() }} of {{ totalPages() }} ({{ totalCount() }} cards)
+                  </small>
+                </div>
+              }
             </div>
           </div>
         </div>
@@ -216,11 +211,13 @@ interface DeckCardEntry {
       </div>
     </div>
   `,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [RouterLink, NgbPagination, CardFiltersComponent],
 })
 export class DeckBuilderComponent implements OnInit {
   protected readonly CardType = CardType;
   protected readonly Arena = Arena;
+
+  @ViewChild(CardFiltersComponent) cardFilters!: CardFiltersComponent;
 
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -232,13 +229,16 @@ export class DeckBuilderComponent implements OnInit {
   deckCards = signal<DeckCardEntry[]>([]);
   availableCards = signal<CardDto[]>([]);
   validation = signal<DeckValidationResult | null>(null);
-  loadingCards = signal(false);
   saving = signal(false);
 
-  // Filters
-  searchControl = new FormControl('');
-  typeFilter = new FormControl<CardType | null>(null);
-  arenaFilter = new FormControl<Arena | null>(null);
+  // Pagination
+  readonly pageSize = 50;
+  currentPage = signal(1);
+  totalCount = signal(0);
+  totalPages = signal(0);
+
+  // Filter state
+  private currentFilter: CardFilter = {};
 
   // Computed values
   totalCards = computed(() => this.deckCards().reduce((sum, entry) => sum + entry.quantity, 0));
@@ -261,16 +261,6 @@ export class DeckBuilderComponent implements OnInit {
       .reduce((sum, e) => sum + e.quantity, 0),
   );
 
-  constructor() {
-    // Set up search debounce
-    this.searchControl.valueChanges
-      .pipe(debounceTime(300), distinctUntilChanged())
-      .subscribe(() => this.loadCards());
-
-    this.typeFilter.valueChanges.subscribe(() => this.loadCards());
-    this.arenaFilter.valueChanges.subscribe(() => this.loadCards());
-  }
-
   ngOnInit(): void {
     const deckId = Number(this.route.snapshot.paramMap.get('id'));
     if (isNaN(deckId)) {
@@ -279,6 +269,11 @@ export class DeckBuilderComponent implements OnInit {
     }
 
     this.loadDeck(deckId);
+  }
+
+  onFilterChange(filter: CardFilter): void {
+    this.currentFilter = filter;
+    this.currentPage.set(1);
     this.loadCards();
   }
 
@@ -293,6 +288,8 @@ export class DeckBuilderComponent implements OnInit {
         }));
         this.deckCards.set(entries);
         this.validateDeck();
+        // Load cards after deck is loaded (for alignment filter)
+        this.loadCards();
       },
       error: () => {
         this.router.navigate(['/decks']);
@@ -301,34 +298,26 @@ export class DeckBuilderComponent implements OnInit {
   }
 
   private loadCards(): void {
-    this.loadingCards.set(true);
-
     const deck = this.deck();
-    const filter = {
-      search: this.searchControl.value || undefined,
-      type: this.typeFilter.value ?? undefined,
-      arena: this.arenaFilter.value ?? undefined,
-      // Filter by deck alignment (allow neutral + deck's alignment)
-      alignment: undefined, // We'll filter client-side for flexibility
+    const filter: CardFilter = {
+      ...this.currentFilter,
+      page: this.currentPage(),
+      pageSize: this.pageSize,
+      alignment: deck?.alignment ?? undefined
     };
 
     this.cardService.getCards(filter).subscribe({
-      next: (cards) => {
-        // Filter to only show cards matching the deck's alignment
-        if (deck) {
-          const deckAlignment = deck.alignment;
-          this.availableCards.set(
-            cards.filter((c) => c.alignment === Alignment.Neutral || c.alignment === deckAlignment),
-          );
-        } else {
-          this.availableCards.set(cards);
-        }
-        this.loadingCards.set(false);
-      },
-      error: () => {
-        this.loadingCards.set(false);
-      },
+      next: (result) => {
+        this.totalCount.set(result.totalCount);
+        this.totalPages.set(result.totalPages);
+        this.availableCards.set(result.items);
+      }
     });
+  }
+
+  goToPage(page: number): void {
+    this.currentPage.set(page);
+    this.loadCards();
   }
 
   getCardQuantity(cardId: number): number {

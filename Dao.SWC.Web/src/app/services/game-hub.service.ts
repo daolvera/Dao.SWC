@@ -169,6 +169,21 @@ export class GameHubService {
     await this.hubConnection.invoke('DiscardCard', cardInstanceId);
   }
 
+  async returnToHand(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ReturnToHand', cardInstanceId);
+  }
+
+  async toggleTap(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ToggleTap', cardInstanceId);
+  }
+
+  async shuffleDeck(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ShuffleDeck');
+  }
+
   async rollDice(numberOfDice: number): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('RollDice', numberOfDice);

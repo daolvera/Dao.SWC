@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { INavigationItem } from '../../models';
 import { NavigationService } from '../../services/navigation.service';
 import { AuthService } from '../../services/auth.service';
 import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
@@ -27,5 +28,11 @@ export class HeaderComponent {
 
   logout(): void {
     this.authService.logout();
+  }
+
+  shouldShowNavItem(item: INavigationItem): boolean {
+    if (item.requiresAuth && !this.authService.isAuthenticated()) return false;
+    if (item.requiresRole && !this.authService.hasRole(item.requiresRole)) return false;
+    return true;
   }
 }

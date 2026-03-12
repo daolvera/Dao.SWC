@@ -1,16 +1,11 @@
+using Dao.SWC.Core;
+
 namespace Dao.SWC.Core.Decks;
 
 public interface ICardService
 {
-    Task<IEnumerable<CardDto>> GetCardsAsync(CardFilterDto? filter = null);
+    Task<PagedResult<CardDto>> GetCardsPagedAsync(CardFilterDto? filter = null);
     Task<CardDto?> GetCardByIdAsync(int cardId);
+    Task<CardDto?> UpdateCardAsync(CardUpdateDto dto);
+    Task<IEnumerable<CardDto>> BulkUpdateCardsAsync(IEnumerable<CardUpdateDto> dtos);
 }
-
-public record CardFilterDto(
-    string? Search = null,
-    Enums.CardType? Type = null,
-    Enums.Alignment? Alignment = null,
-    Enums.Arena? Arena = null,
-    int? Skip = null,
-    int? Take = null
-);

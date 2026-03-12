@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
+import { roleGuard } from './guards/role.guard';
 
 export const routes: Routes = [
   {
@@ -36,6 +37,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () =>
       import('./pages/game/game-room.component').then((m) => m.GameRoomComponent),
+  },
+  // Admin routes
+  {
+    path: 'admin/cards',
+    canActivate: [authGuard, roleGuard('CardEditor')],
+    loadComponent: () =>
+      import('./pages/admin/card-management/card-management.component').then(
+        (m) => m.CardManagementComponent,
+      ),
   },
   {
     path: '**',

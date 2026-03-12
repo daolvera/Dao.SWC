@@ -109,6 +109,7 @@ public static class ApiConfigurationExtensions
                 {
                     options.User.RequireUniqueEmail = true;
                 })
+                .AddRoles<IdentityRole>()
                 .AddEntityFrameworkStores<SwcDbContext>()
                 .AddDefaultTokenProviders();
 

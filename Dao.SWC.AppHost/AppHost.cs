@@ -2,7 +2,7 @@ using Dao.SWC.Core;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var keyVault = builder.AddAzureKeyVault(Constants.ProjectNames.KeyVault);
+//var keyVault = builder.AddAzureKeyVault(Constants.ProjectNames.KeyVault);
 
 var postgres = builder.AddPostgres(Constants.ProjectNames.DatabaseProvider).WithLifetime(ContainerLifetime.Persistent);
 
@@ -10,16 +10,28 @@ var insights = builder.AddAzureApplicationInsights(Constants.ProjectNames.AppIns
 
 var swcDb = postgres.AddDatabase(Constants.ProjectNames.Database);
 
+// Azure Blob Storage with Azurite emulator for local dev
+var blobStorage = builder.AddAzureStorage(Constants.ProjectNames.BlobStorage)
+    .RunAsEmulator(emulator => emulator.WithLifetime(ContainerLifetime.Persistent));
+var blobs = blobStorage.AddBlobs(Constants.ProjectNames.BlobContainer);
+
 var migrations = builder.AddProject<Projects.Dao_SWC_MigrationService>(Constants.ProjectNames.MigrationService)
     .WithReference(swcDb)
     .WaitFor(swcDb);
+
+// Card Importer console app - one-time import tool
+var cardImporter = builder.AddProject<Projects.Dao_SWC_CardImporter>(Constants.ProjectNames.CardImporter)
+    .WithReference(swcDb)
+    .WithReference(blobs)
+    .WaitFor(migrations)
+    .WithExplicitStart();
 
 var apiService = builder.AddProject<Projects.Dao_SWC_ApiService>(Constants.ProjectNames.ApiService)
     .WithExternalHttpEndpoints() // Required for OAuth callbacks
     .WaitFor(migrations)
     .WithReference(swcDb)
+    .WithReference(blobs)
     .WithReference(insights)
-    .WithReference(keyVault)
     .WithHttpHealthCheck("/health");
 
 var webApp = builder

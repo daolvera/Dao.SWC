@@ -1,5 +1,7 @@
+using Dao.SWC.Core;
 using Dao.SWC.Core.Decks;
 using Dao.SWC.Core.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Dao.SWC.ApiService.Controllers;
@@ -9,22 +11,22 @@ namespace Dao.SWC.ApiService.Controllers;
 public class CardsController(ICardService cardService) : ControllerBase
 {
     /// <summary>
-    /// Get all cards with optional filtering.
+    /// Get cards with pagination and optional filtering.
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<CardDto>), 200)]
+    [ProducesResponseType(typeof(PagedResult<CardDto>), 200)]
     public async Task<IActionResult> GetCards(
         [FromQuery] string? search = null,
         [FromQuery] CardType? type = null,
         [FromQuery] Alignment? alignment = null,
         [FromQuery] Arena? arena = null,
-        [FromQuery] int? skip = null,
-        [FromQuery] int? take = null
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50
     )
     {
-        var filter = new CardFilterDto(search, type, alignment, arena, skip, take);
-        var cards = await cardService.GetCardsAsync(filter);
-        return Ok(cards);
+        var filter = new CardFilterDto(search, type, alignment, arena, page, pageSize);
+        var result = await cardService.GetCardsPagedAsync(filter);
+        return Ok(result);
     }
 
     /// <summary>
@@ -43,5 +45,40 @@ public class CardsController(ICardService cardService) : ControllerBase
         }
 
         return Ok(card);
+    }
+
+    /// <summary>
+    /// Update a single card. Requires CardEditor role.
+    /// </summary>
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = $"{Constants.Roles.Admin},{Constants.Roles.CardEditor}")]
+    [ProducesResponseType(typeof(CardDto), 200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> UpdateCard(int id, [FromBody] CardUpdateDto dto)
+    {
+        if (id != dto.Id)
+        {
+            return BadRequest("ID mismatch");
+        }
+
+        var result = await cardService.UpdateCardAsync(dto);
+        if (result == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Bulk update multiple cards. Requires CardEditor role.
+    /// </summary>
+    [HttpPut("bulk")]
+    [Authorize(Roles = $"{Constants.Roles.Admin},{Constants.Roles.CardEditor}")]
+    [ProducesResponseType(typeof(IEnumerable<CardDto>), 200)]
+    public async Task<IActionResult> BulkUpdateCards([FromBody] IEnumerable<CardUpdateDto> dtos)
+    {
+        var result = await cardService.BulkUpdateCardsAsync(dtos);
+        return Ok(result);
     }
 }

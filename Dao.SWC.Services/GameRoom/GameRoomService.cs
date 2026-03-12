@@ -343,6 +343,85 @@ public class GameRoomService : IGameRoomService
         return Task.FromResult<CardInstance?>(card);
     }
 
+    public Task<CardInstance?> ReturnToHandAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId
+            && (c.Zone == CardZone.PlayArea || c.Zone == CardZone.Discard)
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        card.Zone = CardZone.Hand;
+        card.ZonePosition = null;
+        card.Arena = null;
+        card.IsTapped = false;
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<CardInstance?> ToggleTapAsync(string roomCode, string userId, Guid cardInstanceId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId && c.Zone == CardZone.PlayArea
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        card.IsTapped = !card.IsTapped;
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<bool> ShuffleDeckAsync(string roomCode, string userId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(false);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(false);
+        }
+
+        ShuffleDeck(player);
+        return Task.FromResult(true);
+    }
+
     public Task<DiceRollResult> RollDiceAsync(
         string roomCode,
         string userId,

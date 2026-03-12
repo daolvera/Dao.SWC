@@ -345,6 +345,75 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     }
 
     /// <summary>
+    /// Return a card to hand (from play area or discard).
+    /// </summary>
+    public async Task ReturnToHand(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.ReturnToHandAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Toggle tap/untap state of a card in play.
+    /// </summary>
+    public async Task ToggleTap(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.ToggleTapAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Shuffle the player's deck.
+    /// </summary>
+    public async Task ShuffleDeck()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var success = await gameRoomService.ShuffleDeckAsync(roomCode, userId);
+        if (success)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
     /// Roll dice.
     /// </summary>
     public async Task RollDice(int numberOfDice)

@@ -34,7 +34,16 @@ public class GameRoom
     /// </summary>
     public List<DiceRollResult> DiceRolls { get; set; } = [];
 
-    public int MaxPlayers => RoomType == RoomType.OneVsOne ? 2 : 4;
+    public int MaxPlayers =>
+        RoomType switch
+        {
+            RoomType.OneVsOne => 2,
+            RoomType.OneVsTwo => 3,
+            RoomType.TwoVsTwo => 4,
+            _ => 4,
+        };
+
+    public int MinPlayersToStart => RoomType == RoomType.OneVsOne ? 2 : 2;
 
     public bool IsFull => Players.Count >= MaxPlayers;
 

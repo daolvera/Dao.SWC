@@ -44,6 +44,15 @@ import { GameHubService } from '../../services/game-hub.service';
                     <input
                       type="radio"
                       class="btn-check"
+                      id="oneVTwo"
+                      [value]="RoomType.OneVTwo"
+                      formControlName="roomType"
+                    />
+                    <label class="btn btn-outline-primary" for="oneVTwo">1v2</label>
+
+                    <input
+                      type="radio"
+                      class="btn-check"
                       id="twoVTwo"
                       [value]="RoomType.TwoVTwo"
                       formControlName="roomType"
