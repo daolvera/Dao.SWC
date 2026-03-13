@@ -30,6 +30,8 @@ builder.AddNpgsqlDbContext<SwcDbContext>(Constants.ProjectNames.Database);
 // Add Azure Blob Storage from Aspire
 builder.AddAzureBlobServiceClient(Constants.ProjectNames.BlobContainer);
 
+builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
+
 // Add Azure OpenAI client from IOptions configuration
 builder.Services.Configure<AzureOpenAiOptions>(
     builder.Configuration.GetSection(AzureOpenAiOptions.SectionName)

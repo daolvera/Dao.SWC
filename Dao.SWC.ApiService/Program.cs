@@ -31,7 +31,7 @@ builder.Services.AddSpaCors(
         )
 );
 
-//builder.Configuration.AddAzureKeyVaultSecrets(Constants.ProjectNames.KeyVault);
+builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
 
 builder.Services.AddControllers();
 builder.Services.AddRouting(options =>
