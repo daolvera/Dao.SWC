@@ -1,15 +1,14 @@
-const target = process.env["service__swcapi__https_0"] ||
-  process.env["service__swcapi__http_0"] ||
-  "https://localhost:7493"; // Fallback for standalone dev
-
 module.exports = {
   "/api": {
-    target,
+    target:
+      process.env["API_URL"] ||
+      process.env["API_URL"],
     secure: process.env["NODE_ENV"] !== "development",
     changeOrigin: true,
+    logLevel: "debug",
     pathRewrite: {
       "^/api": "" // Remove /api prefix when forwarding to the API
     },
     ws: true, // Enable WebSocket support for SignalR
-  }
+  },
 };

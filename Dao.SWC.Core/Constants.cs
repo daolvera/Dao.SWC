@@ -8,6 +8,7 @@ public static class Constants
     public static class WebAppConfiguration
     {
         public const string AppFolder = "../Dao.SWC.Web";
+        public const string ApiUrlEnvironmentKey = "API_URL";
     }
 
     public static class Authentication
