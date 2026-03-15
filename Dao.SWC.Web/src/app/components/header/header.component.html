@@ -34,6 +34,13 @@
             }
           }
           @if (authService.isAuthenticated()) {
+            @if (authService.isAdmin()) {
+              <!-- Role Management Modal -->
+              <app-role-management-modal #roleModal />
+              <button class="btn btn-outline-secondary" (click)="openRoleModal()">
+                <i class="bi bi-people me-1"></i>Manage Roles
+              </button>
+            }
             <li class="nav-item">
               <span class="nav-link text-muted">
                 {{ authService.userInfo()?.name || authService.userInfo()?.email }}

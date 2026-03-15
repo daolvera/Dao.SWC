@@ -1,4 +1,5 @@
-﻿using Dao.SWC.Core;
+﻿using System.Threading.RateLimiting;
+using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
 using Dao.SWC.Core.Entities;
 using Dao.SWC.Services.Authentication;
@@ -8,7 +9,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using System.Threading.RateLimiting;
 
 namespace Dao.SWC.ApiService.Extensions;
 
@@ -48,20 +48,21 @@ public static class ApiConfigurationExtensions
         {
             services.AddCors(options =>
             {
-                options.AddPolicy(
-                    "AllowAngularApp",
-                    policy =>
+                options.AddDefaultPolicy(policy =>
+                {
+                    // Allow both http and https versions (Azure Container Apps uses https publicly)
+                    var origins = new List<string> { appUrl };
+                    if (appUrl.StartsWith("http://"))
                     {
-                        // Allow both http and https versions (Azure Container Apps uses https publicly)
-                        var origins = new List<string> { appUrl };
-                        if (appUrl.StartsWith("http://"))
-                        {
-                            origins.Add(appUrl.Replace("http://", "https://"));
-                        }
-
-                        policy.WithOrigins([.. origins]).AllowAnyMethod().AllowAnyHeader().AllowCredentials();
+                        origins.Add(appUrl.Replace("http://", "https://"));
                     }
-                );
+
+                    policy
+                        .WithOrigins([.. origins])
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials();
+                });
             });
             return services;
         }
@@ -96,8 +97,8 @@ public static class ApiConfigurationExtensions
         public void AddGoogleAuthentication()
         {
             builder.Services.Configure<JwtOptions>(
-            builder.Configuration.GetSection(JwtOptions.SectionName)
-        );
+                builder.Configuration.GetSection(JwtOptions.SectionName)
+            );
 
             builder
                 .Services.AddOptionsWithValidateOnStart<JwtOptions>()
@@ -147,14 +148,23 @@ public static class ApiConfigurationExtensions
                             var accessToken = context.Request.Query["access_token"];
                             var path = context.HttpContext.Request.Path;
 
-                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                            if (
+                                !string.IsNullOrEmpty(accessToken)
+                                && (
+                                    path.StartsWithSegments(
+                                        Constants.WebAppConfiguration.GameHubPath
+                                    )
+                                )
+                            )
                             {
                                 context.Token = accessToken;
                                 return Task.CompletedTask;
                             }
 
                             // Fall back to cookie-based authentication for regular HTTP requests
-                            var token = context.Request.Cookies[Constants.Authentication.AccessTokenCookieKey];
+                            var token = context.Request.Cookies[
+                                Constants.Authentication.AccessTokenCookieKey
+                            ];
 
                             if (!string.IsNullOrEmpty(token))
                             {
@@ -186,7 +196,9 @@ public static class ApiConfigurationExtensions
                 {
                     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                     options.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
-                    options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
+                    options.ClientSecret = builder.Configuration[
+                        "Authentication:Google:ClientSecret"
+                    ]!;
                     options.CallbackPath = "/Auth/google/callback";
                 });
 

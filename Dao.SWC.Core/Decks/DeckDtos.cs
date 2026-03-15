@@ -54,3 +54,13 @@ public record CardUpdateDto(
     string? ImageUrl,
     string? CardText
 );
+
+public record CardCreateDto(
+    string Name,
+    CardType Type,
+    Alignment Alignment,
+    Arena? Arena,
+    string? Version,
+    string? ImageUrl,
+    string? CardText
+);

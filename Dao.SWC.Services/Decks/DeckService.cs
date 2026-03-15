@@ -1,3 +1,4 @@
+using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Decks;
 using Dao.SWC.Core.Entities;
 using Dao.SWC.Services.Data;
@@ -5,8 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Dao.SWC.Services.Decks;
 
-public class DeckService(SwcDbContext dbContext, IDeckValidationService validationService)
-    : IDeckService
+public class DeckService(
+    SwcDbContext dbContext,
+    IDeckValidationService validationService,
+    ICardImageService imageService
+) : IDeckService
 {
     public async Task<IEnumerable<DeckListItemDto>> GetUserDecksAsync(string userId)
     {
@@ -48,7 +52,7 @@ public class DeckService(SwcDbContext dbContext, IDeckValidationService validati
             return null;
         }
 
-        return MapToDeckDto(deck);
+        return await MapToDeckDtoAsync(deck);
     }
 
     public async Task<DeckDto> CreateDeckAsync(string userId, CreateDeckDto dto)
@@ -64,7 +68,7 @@ public class DeckService(SwcDbContext dbContext, IDeckValidationService validati
         dbContext.Decks.Add(deck);
         await dbContext.SaveChangesAsync();
 
-        return MapToDeckDto(deck);
+        return await MapToDeckDtoAsync(deck);
     }
 
     public async Task<DeckDto?> UpdateDeckAsync(int deckId, string userId, UpdateDeckDto dto)
@@ -132,25 +136,33 @@ public class DeckService(SwcDbContext dbContext, IDeckValidationService validati
         return true;
     }
 
-    private static DeckDto MapToDeckDto(Deck deck)
+    private async Task<DeckDto> MapToDeckDtoAsync(Deck deck)
     {
-        var cards = deck
-            .DeckCards.Where(dc => dc.Card != null)
-            .Select(dc => new DeckCardDto(
-                dc.CardId,
-                dc.Quantity,
-                new CardDto(
-                    dc.Card!.Id,
-                    dc.Card.Name,
-                    dc.Card.Type,
-                    dc.Card.Alignment,
-                    dc.Card.Arena,
-                    dc.Card.Version,
-                    dc.Card.ImageUrl,
-                    dc.Card.CardText
+        var cardDtos = new List<DeckCardDto>();
+
+        foreach (var dc in deck.DeckCards.Where(dc => dc.Card != null))
+        {
+            var imageUrl = string.IsNullOrEmpty(dc.Card!.ImageUrl)
+                ? dc.Card.ImageUrl
+                : await imageService.GenerateReadUrlAsync(dc.Card.ImageUrl);
+
+            cardDtos.Add(
+                new DeckCardDto(
+                    dc.CardId,
+                    dc.Quantity,
+                    new CardDto(
+                        dc.Card.Id,
+                        dc.Card.Name,
+                        dc.Card.Type,
+                        dc.Card.Alignment,
+                        dc.Card.Arena,
+                        dc.Card.Version,
+                        imageUrl,
+                        dc.Card.CardText
+                    )
                 )
-            ))
-            .ToList();
+            );
+        }
 
         return new DeckDto(
             deck.Id,
@@ -158,8 +170,8 @@ public class DeckService(SwcDbContext dbContext, IDeckValidationService validati
             deck.Alignment,
             deck.CreatedAt,
             deck.UpdatedAt,
-            cards.Sum(c => c.Quantity),
-            cards
+            cardDtos.Sum(c => c.Quantity),
+            cardDtos
         );
     }
 }

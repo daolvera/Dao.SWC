@@ -2,11 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
-  inject,
   Input,
   OnDestroy,
   OnInit,
   Output,
+  signal,
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime, distinctUntilChanged, Subject, takeUntil } from 'rxjs';
@@ -28,7 +28,7 @@ import { CardFilter } from '../../models/filters/card-filter';
           [formControl]="searchControl"
         />
       </div>
-      <div [class]="showAlignmentFilter ? 'col-4' : 'col-6'">
+      <div class="col-12">
         <select class="form-select" [formControl]="typeFilter">
           <option [ngValue]="null">All Types</option>
           <option [ngValue]="CardType.Unit">Unit</option>
@@ -38,16 +38,18 @@ import { CardFilter } from '../../models/filters/card-filter';
           <option [ngValue]="CardType.Battle">Battle</option>
         </select>
       </div>
-      <div [class]="showAlignmentFilter ? 'col-4' : 'col-6'">
-        <select class="form-select" [formControl]="arenaFilter">
-          <option [ngValue]="null">All Arenas</option>
-          <option [ngValue]="Arena.Space">Space</option>
-          <option [ngValue]="Arena.Ground">Ground</option>
-          <option [ngValue]="Arena.Character">Character</option>
-        </select>
-      </div>
+      @if (showArenaFilter()) {
+        <div class="col-12">
+          <select class="form-select" [formControl]="arenaFilter">
+            <option [ngValue]="null">All Arenas</option>
+            <option [ngValue]="Arena.Space">Space</option>
+            <option [ngValue]="Arena.Ground">Ground</option>
+            <option [ngValue]="Arena.Character">Character</option>
+          </select>
+        </div>
+      }
       @if (showAlignmentFilter) {
-        <div class="col-4">
+        <div class="col-12">
           <select class="form-select" [formControl]="alignmentFilter">
             <option [ngValue]="null">All Alignments</option>
             <option [ngValue]="Alignment.Light">Light Side</option>
@@ -73,7 +75,13 @@ export class CardFiltersComponent implements OnInit, OnDestroy {
   arenaFilter = new FormControl<Arena | null>(null);
   alignmentFilter = new FormControl<Alignment | null>(null);
 
+  /** Arena filter is only shown for types that can have arenas (Unit, Location) or when no type is selected */
+  showArenaFilter = signal(true);
+
   private destroy$ = new Subject<void>();
+
+  /** Card types that can have arenas */
+  private readonly typesWithArenas: (CardType | null)[] = [null, CardType.Unit, CardType.Location];
 
   ngOnInit(): void {
     // Set up search debounce
@@ -82,7 +90,17 @@ export class CardFiltersComponent implements OnInit, OnDestroy {
       .subscribe(() => this.emitFilter());
 
     // Immediate emit on dropdown changes
-    this.typeFilter.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.emitFilter());
+    this.typeFilter.valueChanges.pipe(takeUntil(this.destroy$)).subscribe((type) => {
+      const canHaveArena = this.typesWithArenas.includes(type);
+      this.showArenaFilter.set(canHaveArena);
+
+      // Reset arena filter to "All Arenas" when hiding
+      if (!canHaveArena && this.arenaFilter.value !== null) {
+        this.arenaFilter.setValue(null, { emitEvent: false });
+      }
+
+      this.emitFilter();
+    });
 
     this.arenaFilter.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => this.emitFilter());
 

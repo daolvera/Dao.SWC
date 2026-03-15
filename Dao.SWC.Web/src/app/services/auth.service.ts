@@ -27,18 +27,18 @@ export class AuthService {
   public isCardEditor = computed(() => this.hasRole(Roles.CardEditor) || this.hasRole(Roles.Admin));
 
   public loadUserInfo() {
-    this.http.get<UserDto>(environment.apiUrl + 'Auth/me').subscribe((user) => {
+    this.http.get<UserDto>(environment.apiUrl + '/Auth/me').subscribe((user) => {
       this.userInfo.set(user);
     });
   }
 
   public login() {
     let requestEndpoint: string = 'google';
-    window.location.href = environment.apiUrl + `Auth/${requestEndpoint}`;
+    window.location.href = environment.apiUrl + `/Auth/${requestEndpoint}`;
   }
 
   public logout() {
-    this.http.delete(environment.apiUrl + 'Auth/logout').subscribe(() => {
+    this.http.delete(environment.apiUrl + '/Auth/logout').subscribe(() => {
       this.userInfo.set(null);
       this.router.navigate(['/']);
     });
@@ -47,7 +47,7 @@ export class AuthService {
   public refreshToken() {
     // Skip spinner to avoid double-counting during auth interceptor retry flows
     const headers = new HttpHeaders().set('X-Skip-Spinner', 'true');
-    return this.http.get(environment.apiUrl + 'Auth/refresh', { headers });
+    return this.http.get(environment.apiUrl + '/Auth/refresh', { headers });
   }
 
   private getCookie(name: string): string | null {

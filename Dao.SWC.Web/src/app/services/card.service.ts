@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { CardDto, CardUpdateDto } from '../models/dtos/card.dto';
+import { CardDto, CardUpdateDto, CardCreateDto } from '../models/dtos/card.dto';
 import { CardFilter } from '../models/filters/card-filter';
 import { PagedResult } from '../models/results/paged-result';
 
@@ -11,7 +11,7 @@ import { PagedResult } from '../models/results/paged-result';
 })
 export class CardService {
   private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}api/cards`;
+  private baseUrl = `${environment.apiUrl}/api/cards`;
 
   getCards(filter?: CardFilter): Observable<PagedResult<CardDto>> {
     let params = new HttpParams();
@@ -50,5 +50,29 @@ export class CardService {
 
   bulkUpdateCards(dtos: CardUpdateDto[]): Observable<CardDto[]> {
     return this.http.put<CardDto[]>(`${this.baseUrl}/bulk`, dtos);
+  }
+
+  createCard(dto: CardCreateDto, image?: File): Observable<CardDto> {
+    const formData = new FormData();
+    formData.append('name', dto.name);
+    formData.append('type', dto.type.toString());
+    formData.append('alignment', dto.alignment.toString());
+    if (dto.arena !== null) {
+      formData.append('arena', dto.arena.toString());
+    }
+    if (dto.version) {
+      formData.append('version', dto.version);
+    }
+    if (dto.cardText) {
+      formData.append('cardText', dto.cardText);
+    }
+    if (image) {
+      formData.append('image', image);
+    }
+    return this.http.post<CardDto>(this.baseUrl, formData);
+  }
+
+  deleteCard(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}`);
   }
 }

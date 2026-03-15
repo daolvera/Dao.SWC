@@ -1,3 +1,5 @@
+using Dao.SWC.Core.Enums;
+
 namespace Dao.SWC.Core.GameRoom;
 
 /// <summary>
@@ -12,6 +14,31 @@ public class GamePlayer
     public string DeckName { get; set; } = string.Empty;
     public Team Team { get; set; }
     public bool IsConnected { get; set; }
+
+    /// <summary>
+    /// The player's Force counter. Starts at 4.
+    /// </summary>
+    public int Force { get; set; } = 4;
+
+    /// <summary>
+    /// The alignment of the player's deck (Light, Dark, or Neutral).
+    /// </summary>
+    public Alignment DeckAlignment { get; set; }
+
+    /// <summary>
+    /// For neutral decks, the alignment the player chose to play as (Light or Dark).
+    /// Null for non-neutral decks.
+    /// </summary>
+    public Alignment? PlayAsAlignment { get; set; }
+
+    /// <summary>
+    /// Gets the effective alignment for gameplay purposes.
+    /// For neutral decks, returns the PlayAsAlignment; otherwise returns DeckAlignment.
+    /// </summary>
+    public Alignment EffectiveAlignment =>
+        DeckAlignment == Alignment.Neutral && PlayAsAlignment.HasValue
+            ? PlayAsAlignment.Value
+            : DeckAlignment;
 
     /// <summary>
     /// All card instances for this player (deck + hand + arenas + discard).

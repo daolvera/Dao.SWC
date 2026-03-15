@@ -2,9 +2,11 @@ using Dao.SWC.ApiService.Extensions;
 using Dao.SWC.ApiService.Hubs;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
+using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Decks;
 using Dao.SWC.Core.GameRoom;
 using Dao.SWC.Services.Authentication;
+using Dao.SWC.Services.CardImport;
 using Dao.SWC.Services.Data;
 using Dao.SWC.Services.Decks;
 using Dao.SWC.Services.GameRoom;
@@ -14,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
+builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -31,8 +34,6 @@ builder.Services.AddSpaCors(
         )
 );
 
-builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
-
 builder.Services.AddControllers();
 builder.Services.AddRouting(options =>
 {
@@ -47,6 +48,8 @@ builder.Services.AddScoped<IAppUserService, AppUserService>();
 builder.Services.AddScoped<IDeckService, DeckService>();
 builder.Services.AddScoped<IDeckValidationService, DeckValidationService>();
 builder.Services.AddScoped<ICardService, CardService>();
+builder.Services.AddScoped<ICardImageService, CardImageService>();
+
 // Configure authentication
 builder.AddGoogleAuthentication();
 
@@ -64,6 +67,8 @@ builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
 builder.AddNpgsqlDbContext<SwcDbContext>(Constants.ProjectNames.Database);
+
+builder.AddAzureBlobServiceClient(Constants.ProjectNames.BlobContainer);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -101,7 +106,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = Dat
 app.MapControllers();
 
 // Map SignalR hubs
-app.MapHub<GameHub>("/gamehub");
+app.MapHub<GameHub>(Constants.WebAppConfiguration.GameHubPath);
 
 app.MapDefaultEndpoints();
 

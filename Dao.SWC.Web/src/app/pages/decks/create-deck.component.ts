@@ -58,7 +58,26 @@ import { DeckService } from '../../services/deck.service';
                         <span class="badge bg-dark">Dark Side</span>
                       </label>
                     </div>
+                    <div class="form-check">
+                      <input
+                        class="form-check-input"
+                        type="radio"
+                        id="alignNeutral"
+                        formControlName="alignment"
+                        [value]="Alignment.Neutral"
+                      />
+                      <label class="form-check-label" for="alignNeutral">
+                        <span class="badge bg-secondary">Pure Neutral</span>
+                      </label>
+                    </div>
                   </div>
+                  @if (form.get('alignment')?.value === Alignment.Neutral) {
+                    <div class="form-text text-info mt-2">
+                      <i class="bi bi-info-circle"></i>
+                      Pure Neutral decks can only contain neutral cards. When playing, you'll choose
+                      Light or Dark side.
+                    </div>
+                  }
                 </div>
 
                 <div class="d-flex gap-2">

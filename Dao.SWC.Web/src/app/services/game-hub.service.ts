@@ -2,8 +2,13 @@ import { inject, Injectable, signal } from '@angular/core';
 import * as signalR from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { DiceRolledEvent, GameRoomDto, RoomType, Team } from '../models/dtos/game.dto';
+import { Alignment } from '../models/dtos/card.dto';
+import { CardInstanceDto, DiceRolledEvent, GameRoomDto, RoomType } from '../models/dtos/game.dto';
 import { AuthService } from './auth.service';
+
+interface SignalRTokenResponse {
+  accessToken: string;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -13,6 +18,8 @@ export class GameHubService {
   private authService = inject(AuthService);
   private _currentRoomCode: string | null = null;
   private _currentUser: string | null = null;
+  private _accessToken: string | null = null;
+  private _pendingError: string | null = null;
 
   // Connection state
   public isConnected = signal(false);
@@ -33,11 +40,15 @@ export class GameHubService {
       return;
     }
 
-    const hubUrl = environment.apiUrl.replace(/\/$/, '') + '/gamehub';
+    // Fetch the access token for SignalR (WebSockets can't use cookies)
+    await this.fetchAccessToken();
+
+    const hubUrl = environment.apiUrl + '/gamehub';
 
     this.hubConnection = new signalR.HubConnectionBuilder()
       .withUrl(hubUrl, {
         withCredentials: true,
+        accessTokenFactory: () => this._accessToken ?? '',
       })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Information)
@@ -55,6 +66,24 @@ export class GameHubService {
       this.connectionError.set('Failed to connect to game server');
       this.isConnected.set(false);
       throw err;
+    }
+  }
+
+  private async fetchAccessToken(): Promise<void> {
+    try {
+      const response = await fetch(environment.apiUrl + '/Auth/signalr-token', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data: SignalRTokenResponse = await response.json();
+        this._accessToken = data.accessToken;
+      } else {
+        console.error('Failed to fetch SignalR token:', response.status);
+        this._accessToken = null;
+      }
+    } catch (err) {
+      console.error('Error fetching SignalR token:', err);
+      this._accessToken = null;
     }
   }
 
@@ -85,8 +114,9 @@ export class GameHubService {
       this._currentRoomCode = null;
     });
 
-    // Error messages
+    // Error messages - also store as pending error for invoke operations
     this.hubConnection.on('Error', (message: string) => {
+      this._pendingError = message;
       this.error$.next(message);
     });
 
@@ -108,16 +138,44 @@ export class GameHubService {
 
   // Room management
 
-  async createRoom(roomType: RoomType, deckId: number): Promise<string> {
+  async createRoom(
+    roomType: RoomType,
+    deckId: number,
+    playAsAlignment?: Alignment,
+  ): Promise<string> {
     if (!this.hubConnection) throw new Error('Not connected');
-    const roomCode = await this.hubConnection.invoke<string>('CreateRoom', roomType, deckId);
+    const roomCode = await this.hubConnection.invoke<string>(
+      'CreateRoom',
+      roomType,
+      deckId,
+      playAsAlignment ?? null,
+    );
     this._currentRoomCode = roomCode;
     return roomCode;
   }
 
-  async joinRoom(roomCode: string, deckId: number): Promise<void> {
+  async joinRoom(roomCode: string, deckId: number, playAsAlignment?: Alignment): Promise<void> {
     if (!this.hubConnection) throw new Error('Not connected');
-    const room = await this.hubConnection.invoke<GameRoomDto>('JoinRoom', roomCode, deckId);
+
+    // Clear any pending error before the invoke
+    this._pendingError = null;
+
+    const room = await this.hubConnection.invoke<GameRoomDto | null>(
+      'JoinRoom',
+      roomCode,
+      deckId,
+      playAsAlignment ?? null,
+    );
+
+    if (!room) {
+      // Use the specific error from the server if available
+      const errorMessage =
+        this._pendingError ||
+        'Failed to join room. The room may not exist or your deck may be invalid.';
+      this._pendingError = null;
+      throw new Error(errorMessage);
+    }
+
     this._currentRoomCode = roomCode;
     this._currentUser = this.extractUsername(room);
     this.roomUpdated$.next(room);
@@ -140,11 +198,6 @@ export class GameHubService {
   async kickPlayer(username: string): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('KickPlayer', username);
-  }
-
-  async assignTeam(username: string, team: Team): Promise<void> {
-    if (!this.hubConnection || !this._currentRoomCode) return;
-    await this.hubConnection.invoke('AssignTeam', username, team);
   }
 
   async startGame(): Promise<void> {
@@ -189,9 +242,19 @@ export class GameHubService {
     await this.hubConnection.invoke('RollDice', numberOfDice);
   }
 
-  async endTurn(): Promise<void> {
+  async viewDeck(): Promise<CardInstanceDto[]> {
+    if (!this.hubConnection || !this._currentRoomCode) return [];
+    return await this.hubConnection.invoke<CardInstanceDto[]>('ViewDeck');
+  }
+
+  async takeFromDeck(cardInstanceId: string): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
-    await this.hubConnection.invoke('EndTurn');
+    await this.hubConnection.invoke('TakeFromDeck', cardInstanceId);
+  }
+
+  async updateForce(force: number): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('UpdateForce', force);
   }
 
   private extractUsername(room: GameRoomDto): string | null {

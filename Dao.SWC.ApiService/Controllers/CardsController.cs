@@ -1,4 +1,5 @@
 using Dao.SWC.Core;
+using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Decks;
 using Dao.SWC.Core.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,8 @@ namespace Dao.SWC.ApiService.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class CardsController(ICardService cardService) : ControllerBase
+public class CardsController(ICardService cardService, ICardImageService imageService)
+    : ControllerBase
 {
     /// <summary>
     /// Get cards with pagination and optional filtering.
@@ -48,6 +50,96 @@ public class CardsController(ICardService cardService) : ControllerBase
     }
 
     /// <summary>
+    /// Create a new card with optional image upload. Requires CardEditor role.
+    /// </summary>
+    [HttpPost]
+    [Authorize(Roles = $"{Constants.Roles.Admin},{Constants.Roles.CardEditor}")]
+    [ProducesResponseType(typeof(CardDto), 201)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> CreateCard([FromForm] CardCreateFormDto form)
+    {
+        string? imageUrl = null;
+
+        // Handle image upload if provided
+        if (form.Image != null && form.Image.Length > 0)
+        {
+            // Validate file type
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+            if (!allowedTypes.Contains(form.Image.ContentType.ToLower()))
+            {
+                return BadRequest("Invalid file type. Allowed types: JPEG, PNG, GIF, WebP");
+            }
+
+            // Validate file size (max 5MB)
+            if (form.Image.Length > 5 * 1024 * 1024)
+            {
+                return BadRequest("File size exceeds 5MB limit");
+            }
+
+            using var stream = form.Image.OpenReadStream();
+            imageUrl = await imageService.UploadCardImageAsync(
+                stream,
+                "custom",
+                form.Image.FileName
+            );
+        }
+
+        var dto = new CardCreateDto(
+            form.Name,
+            form.Type,
+            form.Alignment,
+            form.Arena,
+            form.Version,
+            imageUrl,
+            form.CardText
+        );
+
+        var result = await cardService.CreateCardAsync(dto);
+        return CreatedAtAction(nameof(GetCard), new { id = result.Id }, result);
+    }
+
+    /// <summary>
+    /// Upload a card image. Requires CardEditor role.
+    /// </summary>
+    [HttpPost("upload-image")]
+    [Authorize(Roles = $"{Constants.Roles.Admin},{Constants.Roles.CardEditor}")]
+    [ProducesResponseType(typeof(ImageUploadResult), 200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> UploadImage(
+        IFormFile file,
+        [FromQuery] string? packName = "custom"
+    )
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file uploaded");
+        }
+
+        // Validate file type
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+        if (!allowedTypes.Contains(file.ContentType.ToLower()))
+        {
+            return BadRequest("Invalid file type. Allowed types: JPEG, PNG, GIF, WebP");
+        }
+
+        // Validate file size (max 5MB)
+        if (file.Length > 5 * 1024 * 1024)
+        {
+            return BadRequest("File size exceeds 5MB limit");
+        }
+
+        using var stream = file.OpenReadStream();
+        var blobUrl = await imageService.UploadCardImageAsync(
+            stream,
+            packName ?? "custom",
+            file.FileName
+        );
+        var sasUrl = await imageService.GenerateReadUrlAsync(blobUrl);
+
+        return Ok(new ImageUploadResult(blobUrl, sasUrl));
+    }
+
+    /// <summary>
     /// Update a single card. Requires CardEditor role.
     /// </summary>
     [HttpPut("{id:int}")]
@@ -81,4 +173,38 @@ public class CardsController(ICardService cardService) : ControllerBase
         var result = await cardService.BulkUpdateCardsAsync(dtos);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Delete a card by ID. Requires CardEditor role.
+    /// </summary>
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = $"{Constants.Roles.Admin},{Constants.Roles.CardEditor}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> DeleteCard(int id)
+    {
+        var deleted = await cardService.DeleteCardAsync(id);
+        if (!deleted)
+        {
+            return NotFound();
+        }
+
+        return NoContent();
+    }
+}
+
+public record ImageUploadResult(string BlobUrl, string SasUrl);
+
+/// <summary>
+/// Form data for creating a card with optional image upload.
+/// </summary>
+public class CardCreateFormDto
+{
+    public required string Name { get; set; }
+    public CardType Type { get; set; }
+    public Alignment Alignment { get; set; }
+    public Arena? Arena { get; set; }
+    public string? Version { get; set; }
+    public string? CardText { get; set; }
+    public IFormFile? Image { get; set; }
 }

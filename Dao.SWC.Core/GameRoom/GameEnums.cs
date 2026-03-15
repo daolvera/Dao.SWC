@@ -2,9 +2,9 @@ namespace Dao.SWC.Core.GameRoom;
 
 public enum RoomType
 {
-    OneVsOne = 1,
-    TwoVsTwo = 2,
-    OneVsTwo = 3,
+    OneVsOne,
+    TwoVsTwo,
+    OneVsTwo,
 }
 
 public enum GameState
@@ -16,8 +16,8 @@ public enum GameState
 
 public enum Team
 {
-    Team1 = 1,
-    Team2 = 2,
+    Team1,
+    Team2,
 }
 
 public enum CardZone

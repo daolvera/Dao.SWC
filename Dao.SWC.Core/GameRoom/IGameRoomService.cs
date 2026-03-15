@@ -1,3 +1,5 @@
+using Dao.SWC.Core.Enums;
+
 namespace Dao.SWC.Core.GameRoom;
 
 public interface IGameRoomService
@@ -5,17 +7,27 @@ public interface IGameRoomService
     /// <summary>
     /// Create a new game room.
     /// </summary>
+    /// <param name="playAsAlignment">Required for neutral decks - specifies playing as Light or Dark</param>
     Task<GameRoom> CreateRoomAsync(
         string hostUserId,
         string hostDisplayName,
         RoomType roomType,
-        int deckId
+        int deckId,
+        Alignment? playAsAlignment = null
     );
 
     /// <summary>
     /// Join an existing room.
     /// </summary>
-    Task<GameRoom?> JoinRoomAsync(string roomCode, string userId, string displayName, int deckId);
+    /// <param name="playAsAlignment">Required for neutral decks - specifies playing as Light or Dark</param>
+    /// <returns>JoinRoomResult with the room on success, or an error message on failure</returns>
+    Task<JoinRoomResult> JoinRoomAsync(
+        string roomCode,
+        string userId,
+        string displayName,
+        int deckId,
+        Alignment? playAsAlignment = null
+    );
 
     /// <summary>
     /// Leave a room (or disconnect).
@@ -26,11 +38,6 @@ public interface IGameRoomService
     /// Kick a player from the room (host only).
     /// </summary>
     Task<bool> KickPlayerAsync(string roomCode, string hostUserId, string targetUsername);
-
-    /// <summary>
-    /// Assign a player to a team (host only).
-    /// </summary>
-    Task<bool> AssignTeamAsync(string roomCode, string hostUserId, string targetUserId, Team team);
 
     /// <summary>
     /// Get room by code.
@@ -102,4 +109,19 @@ public interface IGameRoomService
     /// Update a player's connection ID.
     /// </summary>
     void UpdatePlayerConnection(string roomCode, string userId, string? connectionId);
+
+    /// <summary>
+    /// Get all cards in the player's deck for browsing.
+    /// </summary>
+    IEnumerable<CardInstance> GetDeckCards(string roomCode, string userId);
+
+    /// <summary>
+    /// Take a specific card from the deck to hand.
+    /// </summary>
+    Task<CardInstance?> TakeFromDeckAsync(string roomCode, string userId, Guid cardInstanceId);
+
+    /// <summary>
+    /// Update a player's Force counter.
+    /// </summary>
+    Task<bool> UpdateForceAsync(string roomCode, string userId, int force);
 }

@@ -12,9 +12,11 @@ import { NgbModal, NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { Alignment, Arena, CardDto, CardType, CardUpdateDto } from '../../../models/dtos/card.dto';
 import { CardFilter } from '../../../models/filters/card-filter';
 import { CardService } from '../../../services/card.service';
+import { AdminService } from '../../../services/admin.service';
 import { AuthService, Roles } from '../../../services/auth.service';
 import { CardFiltersComponent } from '../../../components/card-filters/card-filters.component';
 import { RoleManagementModalComponent } from '../role-management-modal/role-management-modal.component';
+import { CardCreateModalComponent } from '../card-create-modal/card-create-modal.component';
 
 interface EditableCard extends CardDto {
   isDirty: boolean;
@@ -30,6 +32,7 @@ interface EditableCard extends CardDto {
     NgbPagination,
     CardFiltersComponent,
     RoleManagementModalComponent,
+    CardCreateModalComponent,
   ],
   template: `
     <div class="container-fluid py-3">
@@ -41,11 +44,20 @@ interface EditableCard extends CardDto {
           <h2 class="mb-0">Card Management</h2>
         </div>
         <div class="d-flex gap-2">
-          @if (authService.isAdmin()) {
-            <button class="btn btn-outline-secondary" (click)="openRoleModal()">
-              <i class="bi bi-people me-1"></i>Manage Roles
-            </button>
-          }
+          <button
+            class="btn btn-outline-secondary"
+            [disabled]="seeding()"
+            (click)="seedCards()"
+            title="Add test cards to database"
+          >
+            @if (seeding()) {
+              <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            <i class="bi bi-database-add me-1"></i>Seed Test Cards
+          </button>
+          <button class="btn btn-success" (click)="openCreateModal()">
+            <i class="bi bi-plus-lg me-1"></i>New Card
+          </button>
           <button
             class="btn btn-primary"
             [disabled]="!hasChanges() || saving()"
@@ -98,6 +110,7 @@ interface EditableCard extends CardDto {
               <th style="width: 80px;">Version</th>
               <th style="width: 200px;">Image URL</th>
               <th>Card Text</th>
+              <th style="width: 60px;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -174,6 +187,15 @@ interface EditableCard extends CardDto {
                     style="resize: vertical; min-height: 60px;"
                   ></textarea>
                 </td>
+                <td class="align-middle text-center">
+                  <button
+                    class="btn btn-outline-danger btn-sm"
+                    title="Delete card"
+                    (click)="deleteCard(card)"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
               </tr>
             }
           </tbody>
@@ -199,6 +221,9 @@ interface EditableCard extends CardDto {
 
     <!-- Role Management Modal -->
     <app-role-management-modal />
+
+    <!-- Card Create Modal -->
+    <app-card-create-modal (cardCreated)="onCardCreated($event)" />
   `,
   styles: [
     `
@@ -217,15 +242,16 @@ export class CardManagementComponent implements OnInit {
   protected readonly Alignment = Alignment;
   protected readonly Arena = Arena;
 
-  @ViewChild(RoleManagementModalComponent) roleModal!: RoleManagementModalComponent;
+  @ViewChild(CardCreateModalComponent) cardCreateModal!: CardCreateModalComponent;
 
   private cardService = inject(CardService);
+  private adminService = inject(AdminService);
   protected authService = inject(AuthService);
-  private modalService = inject(NgbModal);
 
   // State
   cards = signal<EditableCard[]>([]);
   saving = signal(false);
+  seeding = signal(false);
   currentFilter: CardFilter = {};
 
   // Pagination
@@ -324,7 +350,45 @@ export class CardManagementComponent implements OnInit {
     });
   }
 
-  openRoleModal(): void {
-    this.roleModal.open();
+  openCreateModal(): void {
+    this.cardCreateModal.open();
+  }
+
+  onCardCreated(card: CardDto): void {
+    // Reload the current page to show the new card
+    this.loadCards();
+  }
+
+  seedCards(): void {
+    if (!confirm('This will add test cards to the database. Continue?')) {
+      return;
+    }
+
+    this.seeding.set(true);
+    this.adminService.seedCards().subscribe({
+      next: (result) => {
+        alert(`Added ${result.cardsAdded} test cards. Total cards: ${result.totalCards}`);
+        this.loadCards();
+        this.seeding.set(false);
+      },
+      error: () => {
+        this.seeding.set(false);
+      },
+    });
+  }
+
+  deleteCard(card: EditableCard): void {
+    if (!confirm(`Are you sure you want to delete "${card.name}"?`)) {
+      return;
+    }
+
+    this.cardService.deleteCard(card.id).subscribe({
+      next: () => {
+        // Remove the card from the local list
+        this.cards.update((cards) => cards.filter((c) => c.id !== card.id));
+        this.totalCount.update((count) => count - 1);
+        this.updateDirtyState();
+      },
+    });
   }
 }

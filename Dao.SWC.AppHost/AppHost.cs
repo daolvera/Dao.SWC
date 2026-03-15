@@ -29,6 +29,7 @@ var cardImporter = builder
     .WithReference(swcDb)
     .WithReference(blobs)
     .WithReference(keyVault)
+    .WithReference(insights)
     .WaitFor(migrations)
     .WithExplicitStart();
 
@@ -49,7 +50,7 @@ var webApp = builder
     .WithHttpEndpoint(targetPort: 3000, env: "PORT")
     .WithEnvironment(
         Constants.WebAppConfiguration.ApiUrlEnvironmentKey,
-        apiService.GetEndpoint("http")
+        apiService.GetEndpoint("https")
     )
     .WithExternalHttpEndpoints()
     .PublishAsDockerFile()
