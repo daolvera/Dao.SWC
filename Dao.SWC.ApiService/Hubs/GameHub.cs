@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Security.Claims;
 using Dao.SWC.ApiService.Extensions;
+using Dao.SWC.Core.Enums;
 using Dao.SWC.Core.GameRoom;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -41,18 +43,34 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     /// <summary>
     /// Create a new game room. Returns room code on success.
     /// </summary>
-    public async Task<string?> CreateRoom(RoomType roomType, int deckId)
+    /// <param name="playAsAlignment">Required for neutral decks - specifies playing as Light or Dark</param>
+    public async Task<string?> CreateRoom(
+        RoomType roomType,
+        int deckId,
+        Alignment? playAsAlignment = null
+    )
     {
         var userId = Context.User?.GetAppUserId();
-        var displayName = Context.User?.Identity?.Name ?? "Player";
+        string displayName = Context.User?.FindFirstValue(ClaimTypes.Email)!;
 
         if (userId == null)
         {
+            logger.LogWarning(
+                "CreateRoom failed: User not authenticated. ConnectionId: {ConnectionId}, Claims: {Claims}",
+                Context.ConnectionId,
+                string.Join(", ", Context.User?.Claims.Select(c => $"{c.Type}={c.Value}") ?? [])
+            );
             await Clients.Caller.SendAsync("Error", "Not authenticated");
             return null;
         }
 
-        var room = await gameRoomService.CreateRoomAsync(userId, displayName, roomType, deckId);
+        var room = await gameRoomService.CreateRoomAsync(
+            userId,
+            displayName,
+            roomType,
+            deckId,
+            playAsAlignment
+        );
 
         // Update connection ID for the host
         gameRoomService.UpdatePlayerConnection(room.RoomCode, userId, Context.ConnectionId);
@@ -72,10 +90,15 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     /// <summary>
     /// Join an existing room.
     /// </summary>
-    public async Task<GameRoomDto?> JoinRoom(string roomCode, int deckId)
+    /// <param name="playAsAlignment">Required for neutral decks - specifies playing as Light or Dark</param>
+    public async Task<GameRoomDto?> JoinRoom(
+        string roomCode,
+        int deckId,
+        Alignment? playAsAlignment = null
+    )
     {
         var userId = Context.User?.GetAppUserId();
-        var displayName = Context.User?.Identity?.Name ?? "Player";
+        string displayName = Context.User?.FindFirstValue(ClaimTypes.Email)!;
 
         if (userId == null)
         {
@@ -83,12 +106,21 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             return null;
         }
 
-        var room = await gameRoomService.JoinRoomAsync(roomCode, userId, displayName, deckId);
-        if (room == null)
+        var result = await gameRoomService.JoinRoomAsync(
+            roomCode,
+            userId,
+            displayName,
+            deckId,
+            playAsAlignment
+        );
+
+        if (!result.Success)
         {
-            await Clients.Caller.SendAsync("Error", "Could not join room");
+            await Clients.Caller.SendAsync("Error", result.Error ?? "Could not join room");
             return null;
         }
+
+        var room = result.Room!;
 
         // Update connection ID
         gameRoomService.UpdatePlayerConnection(roomCode, userId, Context.ConnectionId);
@@ -210,39 +242,6 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
                 username,
                 roomCode
             );
-        }
-    }
-
-    /// <summary>
-    /// Assign a player to a team (host only).
-    /// </summary>
-    public async Task AssignTeam(string username, Team team)
-    {
-        var hostUserId = Context.User?.GetAppUserId();
-        var roomCode = GetCurrentRoomCode();
-        if (hostUserId == null || roomCode == null)
-            return;
-
-        var room = gameRoomService.GetRoom(roomCode);
-        var targetPlayer = room?.Players.FirstOrDefault(p =>
-            p.DisplayName.Equals(username, StringComparison.OrdinalIgnoreCase)
-        );
-        if (targetPlayer == null)
-            return;
-
-        var success = await gameRoomService.AssignTeamAsync(
-            roomCode,
-            hostUserId,
-            targetPlayer.UserId,
-            team
-        );
-        if (success)
-        {
-            room = gameRoomService.GetRoom(roomCode);
-            if (room != null)
-            {
-                await SendRoomUpdateToGroupAsync(room);
-            }
         }
     }
 
@@ -419,7 +418,7 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     public async Task RollDice(int numberOfDice)
     {
         var userId = Context.User?.GetAppUserId();
-        var displayName = Context.User?.Identity?.Name ?? "Player";
+        string displayName = Context.User?.FindFirstValue(ClaimTypes.Email)!;
         var roomCode = GetCurrentRoomCode();
 
         if (userId == null || roomCode == null)
@@ -442,17 +441,55 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     }
 
     /// <summary>
-    /// End current turn.
+    /// View all cards in the player's deck for browsing.
     /// </summary>
-    public async Task EndTurn()
+    public async Task<IEnumerable<CardInstanceDto>> ViewDeck()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return [];
+
+        var deckCards = gameRoomService.GetDeckCards(roomCode, userId);
+        return await Task.FromResult(deckCards.Select(MapToCardInstanceDto));
+    }
+
+    /// <summary>
+    /// Take a specific card from deck to hand.
+    /// </summary>
+    public async Task TakeFromDeck(string cardInstanceId)
     {
         var userId = Context.User?.GetAppUserId();
         var roomCode = GetCurrentRoomCode();
         if (userId == null || roomCode == null)
             return;
 
-        var nextUserId = await gameRoomService.EndTurnAsync(roomCode, userId);
-        if (nextUserId != null)
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.TakeFromDeckAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Update the player's Force counter.
+    /// </summary>
+    public async Task UpdateForce(int force)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var success = await gameRoomService.UpdateForceAsync(roomCode, userId, force);
+        if (success)
         {
             var room = gameRoomService.GetRoom(roomCode);
             if (room != null)
@@ -493,7 +530,6 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             room.RoomCode,
             room.RoomType,
             room.State,
-            room.TurnNumber,
             room.Players.Select(p => MapToPlayerDto(p, p.UserId == viewingUserId, room.HostUserId))
         );
     }
@@ -503,9 +539,10 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
         return new GamePlayerDto(
             player.DisplayName,
             player.DeckName,
-            player.Team,
+            player.EffectiveAlignment,
             player.UserId == hostUserId,
             player.IsConnected,
+            player.Force,
             isMe ? player.Hand.Select(MapToCardInstanceDto) : [],
             player.Deck.Count(),
             new Dictionary<string, IEnumerable<CardInstanceDto>>
@@ -525,6 +562,7 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             card.CardId,
             card.CardName,
             card.ImageUrl,
+            (int)card.CardType,
             card.IsTapped
         );
     }

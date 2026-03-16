@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 using Dao.SWC.Core;
 using Dao.SWC.Core.CardImport;
 using Microsoft.Extensions.Logging;
@@ -33,8 +34,7 @@ public partial class CardImageService : ICardImageService
 
         // Sanitize pack name for blob path (remove special chars, use lowercase)
         var sanitizedPackName = SanitizeForBlobPath(packName);
-        var blobPath =
-            $"{Constants.ImportOptions.CardsContainerName}/{sanitizedPackName}/{fileName}";
+        var blobPath = $"{sanitizedPackName}/{fileName}";
 
         _logger.LogDebug("Uploading card image to: {BlobPath}", blobPath);
 
@@ -59,6 +59,78 @@ public partial class CardImageService : ICardImageService
         return blobClient.Uri.ToString();
     }
 
+    public async Task<string> GenerateReadUrlAsync(
+        string blobUrl,
+        TimeSpan? expiresIn = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (string.IsNullOrEmpty(blobUrl))
+        {
+            return string.Empty;
+        }
+
+        var expiry = expiresIn ?? TimeSpan.FromHours(1);
+
+        try
+        {
+            // Parse the blob URL to get the blob client
+            var blobUriBuilder = new BlobUriBuilder(new Uri(blobUrl));
+            var containerClient = _blobServiceClient.GetBlobContainerClient(
+                blobUriBuilder.BlobContainerName
+            );
+            var blobClient = containerClient.GetBlobClient(blobUriBuilder.BlobName);
+
+            // Get a user delegation key for generating SAS tokens with managed identity
+            var startsOn = DateTimeOffset.UtcNow.AddMinutes(-5); // Allow for clock skew
+            var expiresOn = DateTimeOffset.UtcNow.Add(expiry);
+
+            var userDelegationKey = await _blobServiceClient.GetUserDelegationKeyAsync(
+                startsOn,
+                expiresOn,
+                cancellationToken
+            );
+
+            // Create the SAS builder
+            var sasBuilder = new BlobSasBuilder
+            {
+                BlobContainerName = blobUriBuilder.BlobContainerName,
+                BlobName = blobUriBuilder.BlobName,
+                Resource = "b", // b = blob
+                StartsOn = startsOn,
+                ExpiresOn = expiresOn,
+            };
+
+            // Set read permissions
+            sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+            // Generate the SAS token using user delegation key
+            var sasQueryParameters = sasBuilder.ToSasQueryParameters(
+                userDelegationKey,
+                _blobServiceClient.AccountName
+            );
+
+            // Build the full URL with SAS token
+            blobUriBuilder.Sas = sasQueryParameters;
+
+            _logger.LogDebug(
+                "Generated user delegation SAS URL for blob: {BlobName}",
+                blobClient.Name
+            );
+
+            return blobUriBuilder.ToUri().ToString();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error generating user delegation SAS token for blob URL: {BlobUrl}",
+                blobUrl
+            );
+            return blobUrl; // Return original URL as fallback
+        }
+    }
+
     private async Task<BlobContainerClient> GetOrCreateContainerAsync(
         CancellationToken cancellationToken
     )
@@ -72,9 +144,9 @@ public partial class CardImageService : ICardImageService
             Constants.ImportOptions.CardsContainerName
         );
 
-        // Create container with public blob access if it doesn't exist
+        // Create container with private access if it doesn't exist
         await _containerClient.CreateIfNotExistsAsync(
-            publicAccessType: PublicAccessType.Blob,
+            publicAccessType: PublicAccessType.None,
             cancellationToken: cancellationToken
         );
 

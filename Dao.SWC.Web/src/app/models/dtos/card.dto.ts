@@ -39,3 +39,12 @@ export interface CardUpdateDto {
   imageUrl: string | null;
   cardText: string | null;
 }
+
+export interface CardCreateDto {
+  name: string;
+  type: CardType;
+  alignment: Alignment;
+  arena: Arena | null;
+  version: string | null;
+  cardText: string | null;
+}

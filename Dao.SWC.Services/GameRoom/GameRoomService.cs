@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using Dao.SWC.Core.CardImport;
+using Dao.SWC.Core.Enums;
 using Dao.SWC.Core.GameRoom;
 using Dao.SWC.Services.Data;
 using Microsoft.EntityFrameworkCore;
@@ -9,19 +11,26 @@ public class GameRoomService : IGameRoomService
 {
     private readonly ConcurrentDictionary<string, Core.GameRoom.GameRoom> _rooms;
     private readonly SwcDbContext _dbContext;
+    private readonly ICardImageService _imageService;
     private static readonly Random _random = new();
 
-    public GameRoomService(SwcDbContext dbContext, IGameRoomStorage storage)
+    public GameRoomService(
+        SwcDbContext dbContext,
+        IGameRoomStorage storage,
+        ICardImageService imageService
+    )
     {
         _dbContext = dbContext;
         _rooms = storage.Rooms;
+        _imageService = imageService;
     }
 
     public async Task<Core.GameRoom.GameRoom> CreateRoomAsync(
         string hostUserId,
         string hostDisplayName,
         RoomType roomType,
-        int deckId
+        int deckId,
+        Alignment? playAsAlignment = null
     )
     {
         var roomCode = GenerateRoomCode();
@@ -31,6 +40,11 @@ public class GameRoomService : IGameRoomService
         {
             roomCode = GenerateRoomCode();
         }
+
+        // Fetch deck alignment
+        var deck = await _dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deckId);
+
+        Alignment deckAlignment = (Alignment)(deck?.Alignment ?? Alignment.Neutral);
 
         var room = new Core.GameRoom.GameRoom
         {
@@ -48,6 +62,8 @@ public class GameRoomService : IGameRoomService
             DeckId = deckId,
             Team = Team.Team1,
             IsConnected = true,
+            DeckAlignment = deckAlignment,
+            PlayAsAlignment = playAsAlignment,
         };
 
         room.Players.Add(hostPlayer);
@@ -56,26 +72,48 @@ public class GameRoomService : IGameRoomService
         return room;
     }
 
-    public async Task<Core.GameRoom.GameRoom?> JoinRoomAsync(
+    public async Task<JoinRoomResult> JoinRoomAsync(
         string roomCode,
         string userId,
         string displayName,
-        int deckId
+        int deckId,
+        Alignment? playAsAlignment = null
     )
     {
         if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
         {
-            return null;
+            return JoinRoomResult.Failed("Room not found");
         }
 
         if (room.State != GameState.Waiting)
         {
-            return null; // Game already started
+            return JoinRoomResult.Failed("Game already started");
         }
 
         if (room.IsFull)
         {
-            return null;
+            return JoinRoomResult.Failed("Room is full");
+        }
+
+        // Fetch deck alignment
+        var deck = await _dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deckId);
+
+        if (deck == null)
+        {
+            return JoinRoomResult.Failed("Deck not found");
+        }
+
+        var deckAlignment = deck.Alignment;
+        Alignment effectiveAlignment =
+            deckAlignment == Alignment.Neutral && playAsAlignment.HasValue
+                ? playAsAlignment.Value
+                : deckAlignment;
+
+        // Validate alignment based on room type and existing players
+        var validationError = ValidateJoinAlignment(room, effectiveAlignment);
+        if (validationError != null)
+        {
+            return JoinRoomResult.Failed(validationError);
         }
 
         // Check if already in room
@@ -84,7 +122,9 @@ public class GameRoomService : IGameRoomService
         {
             existingPlayer.IsConnected = true;
             existingPlayer.DeckId = deckId;
-            return room;
+            existingPlayer.DeckAlignment = deckAlignment;
+            existingPlayer.PlayAsAlignment = playAsAlignment;
+            return JoinRoomResult.Succeeded(room);
         }
 
         // Auto-assign team based on room type and current players
@@ -97,10 +137,66 @@ public class GameRoomService : IGameRoomService
             DeckId = deckId,
             Team = team,
             IsConnected = true,
+            DeckAlignment = deckAlignment,
+            PlayAsAlignment = playAsAlignment,
         };
 
         room.Players.Add(player);
-        return room;
+        return JoinRoomResult.Succeeded(room);
+    }
+
+    /// <summary>
+    /// Validates that a player can join the room with the given effective alignment.
+    /// </summary>
+    /// <returns>Error message if invalid, null if valid</returns>
+    private static string? ValidateJoinAlignment(
+        Core.GameRoom.GameRoom room,
+        Alignment joinerAlignment
+    )
+    {
+        // Get the host's effective alignment
+        var host = room.Players.FirstOrDefault(p => p.UserId == room.HostUserId);
+        if (host == null)
+        {
+            return null; // Should not happen
+        }
+
+        var hostAlignment = host.EffectiveAlignment;
+
+        // For 1v1: The joiner must be the opposite side
+        if (room.RoomType == RoomType.OneVsOne)
+        {
+            if (hostAlignment == Alignment.Light && joinerAlignment != Alignment.Dark)
+            {
+                return "In 1v1 games, you must play the opposite side. The host is playing Light, so you must use a Dark side deck (or a neutral deck playing as Dark).";
+            }
+            if (hostAlignment == Alignment.Dark && joinerAlignment != Alignment.Light)
+            {
+                return "In 1v1 games, you must play the opposite side. The host is playing Dark, so you must use a Light side deck (or a neutral deck playing as Light).";
+            }
+            return null;
+        }
+
+        // For 2v2 and 1v2: Check if the side is already full
+        if (room.RoomType == RoomType.TwoVsTwo || room.RoomType == RoomType.OneVsTwo)
+        {
+            var maxPerSide = room.RoomType == RoomType.TwoVsTwo ? 2 : 2;
+
+            var lightCount = room.Players.Count(p => p.EffectiveAlignment == Alignment.Light);
+            var darkCount = room.Players.Count(p => p.EffectiveAlignment == Alignment.Dark);
+
+            if (joinerAlignment == Alignment.Light && lightCount >= maxPerSide)
+            {
+                return $"Cannot join as Light side. {lightCount} player(s) are already playing Light side (max {maxPerSide}).";
+            }
+            if (joinerAlignment == Alignment.Dark && darkCount >= maxPerSide)
+            {
+                return $"Cannot join as Dark side. {darkCount} player(s) are already playing Dark side (max {maxPerSide}).";
+            }
+            return null;
+        }
+
+        throw new InvalidOperationException("Game room type not detected");
     }
 
     public Task<bool> LeaveRoomAsync(string roomCode, string userId)
@@ -164,38 +260,6 @@ public class GameRoomService : IGameRoomService
         }
 
         room.Players.Remove(player);
-        return Task.FromResult(true);
-    }
-
-    public Task<bool> AssignTeamAsync(
-        string roomCode,
-        string hostUserId,
-        string targetUserId,
-        Team team
-    )
-    {
-        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
-        {
-            return Task.FromResult(false);
-        }
-
-        if (!room.IsHost(hostUserId))
-        {
-            return Task.FromResult(false);
-        }
-
-        if (room.State != GameState.Waiting)
-        {
-            return Task.FromResult(false);
-        }
-
-        var player = room.GetPlayer(targetUserId);
-        if (player == null)
-        {
-            return Task.FromResult(false);
-        }
-
-        player.Team = team;
         return Task.FromResult(true);
     }
 
@@ -508,6 +572,73 @@ public class GameRoomService : IGameRoomService
         }
     }
 
+    public IEnumerable<CardInstance> GetDeckCards(string roomCode, string userId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return [];
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return [];
+        }
+
+        return player.Deck.ToList();
+    }
+
+    public Task<CardInstance?> TakeFromDeckAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId && c.Zone == CardZone.Deck
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Move card from deck to hand
+        card.Zone = CardZone.Hand;
+        card.ZonePosition = null;
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<bool> UpdateForceAsync(string roomCode, string userId, int force)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(false);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(false);
+        }
+
+        // Clamp force to reasonable bounds (0 to 99)
+        player.Force = Math.Clamp(force, 0, 99);
+        return Task.FromResult(true);
+    }
+
     #region Private Helpers
 
     private static string GenerateRoomCode()
@@ -552,6 +683,11 @@ public class GameRoomService : IGameRoomService
             if (deckCard.Card == null)
                 continue;
 
+            // Generate SAS token URL for the card image
+            var imageUrl = string.IsNullOrEmpty(deckCard.Card.ImageUrl)
+                ? deckCard.Card.ImageUrl
+                : await _imageService.GenerateReadUrlAsync(deckCard.Card.ImageUrl);
+
             // Create card instances based on quantity
             for (int i = 0; i < deckCard.Quantity; i++)
             {
@@ -560,7 +696,8 @@ public class GameRoomService : IGameRoomService
                     {
                         CardId = deckCard.CardId,
                         CardName = deckCard.Card.Name,
-                        ImageUrl = deckCard.Card.ImageUrl,
+                        ImageUrl = imageUrl,
+                        CardType = deckCard.Card.Type,
                         Zone = CardZone.Deck,
                     }
                 );

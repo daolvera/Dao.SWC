@@ -15,12 +15,17 @@ export interface AssignRoleDto {
   role: string;
 }
 
+export interface SeedCardsResult {
+  cardsAdded: number;
+  totalCards: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
 export class AdminService {
   private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}api/admin`;
+  private baseUrl = `${environment.apiUrl}/api/admin`;
 
   getUsers(): Observable<UserRoleDto[]> {
     return this.http.get<UserRoleDto[]>(`${this.baseUrl}/users`);
@@ -36,5 +41,9 @@ export class AdminService {
 
   removeRole(email: string, role: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/roles/remove`, { email, role });
+  }
+
+  seedCards(): Observable<SeedCardsResult> {
+    return this.http.post<SeedCardsResult>(`${this.baseUrl}/seed-cards`, {});
   }
 }

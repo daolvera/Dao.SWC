@@ -1,11 +1,14 @@
 using Dao.SWC.Core;
+using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Decks;
+using Dao.SWC.Core.Entities;
+using Dao.SWC.Core.Enums;
 using Dao.SWC.Services.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dao.SWC.Services.Decks;
 
-public class CardService(SwcDbContext dbContext) : ICardService
+public class CardService(SwcDbContext dbContext, ICardImageService imageService) : ICardService
 {
     public async Task<PagedResult<CardDto>> GetCardsPagedAsync(CardFilterDto? filter = null)
     {
@@ -17,8 +20,11 @@ public class CardService(SwcDbContext dbContext) : ICardService
         {
             var search = filter.Search.ToLower();
             query = query.Where(c =>
-                c.Name.ToLower().Contains(search)
-                || (c.CardText != null && c.CardText.ToLower().Contains(search))
+                c.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                || (
+                    c.CardText != null
+                    && c.CardText.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                )
             );
         }
 
@@ -29,7 +35,17 @@ public class CardService(SwcDbContext dbContext) : ICardService
 
         if (filter.Alignment.HasValue)
         {
-            query = query.Where(c => c.Alignment == filter.Alignment.Value);
+            // Include Neutral cards when filtering by Light or Dark
+            if (filter.Alignment.Value == Alignment.Neutral)
+            {
+                query = query.Where(c => c.Alignment == Alignment.Neutral);
+            }
+            else
+            {
+                query = query.Where(c =>
+                    c.Alignment == filter.Alignment.Value || c.Alignment == Alignment.Neutral
+                );
+            }
         }
 
         if (filter.Arena.HasValue)
@@ -45,20 +61,32 @@ public class CardService(SwcDbContext dbContext) : ICardService
             .ThenBy(c => c.Version)
             .Skip((filter.Page - 1) * filter.PageSize)
             .Take(filter.PageSize)
-            .Select(c => new CardDto(
-                c.Id,
-                c.Name,
-                c.Type,
-                c.Alignment,
-                c.Arena,
-                c.Version,
-                c.ImageUrl,
-                c.CardText
-            ))
             .ToListAsync();
 
+        // Transform image URLs to include SAS tokens
+        var cardDtos = new List<CardDto>();
+        foreach (var c in cards)
+        {
+            var imageUrl = string.IsNullOrEmpty(c.ImageUrl)
+                ? c.ImageUrl
+                : await imageService.GenerateReadUrlAsync(c.ImageUrl);
+
+            cardDtos.Add(
+                new CardDto(
+                    c.Id,
+                    c.Name,
+                    c.Type,
+                    c.Alignment,
+                    c.Arena,
+                    c.Version,
+                    imageUrl,
+                    c.CardText
+                )
+            );
+        }
+
         return new PagedResult<CardDto>(
-            cards,
+            cardDtos,
             filter.Page,
             filter.PageSize,
             totalCount,
@@ -75,6 +103,10 @@ public class CardService(SwcDbContext dbContext) : ICardService
             return null;
         }
 
+        var imageUrl = string.IsNullOrEmpty(card.ImageUrl)
+            ? card.ImageUrl
+            : await imageService.GenerateReadUrlAsync(card.ImageUrl);
+
         return new CardDto(
             card.Id,
             card.Name,
@@ -82,7 +114,39 @@ public class CardService(SwcDbContext dbContext) : ICardService
             card.Alignment,
             card.Arena,
             card.Version,
-            card.ImageUrl,
+            imageUrl,
+            card.CardText
+        );
+    }
+
+    public async Task<CardDto> CreateCardAsync(CardCreateDto dto)
+    {
+        var card = new Card
+        {
+            Name = dto.Name,
+            Type = dto.Type,
+            Alignment = dto.Alignment,
+            Arena = dto.Arena,
+            Version = dto.Version,
+            ImageUrl = dto.ImageUrl,
+            CardText = dto.CardText,
+        };
+
+        dbContext.Cards.Add(card);
+        await dbContext.SaveChangesAsync();
+
+        var imageUrl = string.IsNullOrEmpty(card.ImageUrl)
+            ? card.ImageUrl
+            : await imageService.GenerateReadUrlAsync(card.ImageUrl);
+
+        return new CardDto(
+            card.Id,
+            card.Name,
+            card.Type,
+            card.Alignment,
+            card.Arena,
+            card.Version,
+            imageUrl,
             card.CardText
         );
     }
@@ -105,6 +169,10 @@ public class CardService(SwcDbContext dbContext) : ICardService
 
         await dbContext.SaveChangesAsync();
 
+        var imageUrl = string.IsNullOrEmpty(card.ImageUrl)
+            ? card.ImageUrl
+            : await imageService.GenerateReadUrlAsync(card.ImageUrl);
+
         return new CardDto(
             card.Id,
             card.Name,
@@ -112,7 +180,7 @@ public class CardService(SwcDbContext dbContext) : ICardService
             card.Alignment,
             card.Arena,
             card.Version,
-            card.ImageUrl,
+            imageUrl,
             card.CardText
         );
     }
@@ -141,6 +209,10 @@ public class CardService(SwcDbContext dbContext) : ICardService
             card.ImageUrl = dto.ImageUrl;
             card.CardText = dto.CardText;
 
+            var imageUrl = string.IsNullOrEmpty(card.ImageUrl)
+                ? card.ImageUrl
+                : await imageService.GenerateReadUrlAsync(card.ImageUrl);
+
             updatedCards.Add(
                 new CardDto(
                     card.Id,
@@ -149,7 +221,7 @@ public class CardService(SwcDbContext dbContext) : ICardService
                     card.Alignment,
                     card.Arena,
                     card.Version,
-                    card.ImageUrl,
+                    imageUrl,
                     card.CardText
                 )
             );
@@ -158,5 +230,18 @@ public class CardService(SwcDbContext dbContext) : ICardService
         await dbContext.SaveChangesAsync();
 
         return updatedCards;
+    }
+
+    public async Task<bool> DeleteCardAsync(int cardId)
+    {
+        var card = await dbContext.Cards.FindAsync(cardId);
+        if (card == null)
+        {
+            return false;
+        }
+
+        dbContext.Cards.Remove(card);
+        await dbContext.SaveChangesAsync();
+        return true;
     }
 }

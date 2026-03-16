@@ -23,7 +23,8 @@ public class AuthController(
     IAppUserService AppUserService,
     IAppUserRepository AppUserRepository,
     IConfiguration Configuration,
-    ILogger<AuthController> Logger) : ControllerBase
+    ILogger<AuthController> Logger
+) : ControllerBase
 {
     [Authorize]
     [HttpGet("me")]
@@ -39,9 +40,7 @@ public class AuthController(
         var appUser =
             await AppUserService.GetByAppUserIdAsync(user.Id)
             ?? throw new NotFoundException($"User for {user.UserName}");
-        return Ok(
-           appUser
-        );
+        return Ok(appUser);
     }
 
     [Authorize]
@@ -53,6 +52,24 @@ public class AuthController(
         Response.Cookies.Delete(Constants.Authentication.IsAuthenticatedCookieKey);
 
         return Ok();
+    }
+
+    /// <summary>
+    /// Returns the access token for SignalR connections.
+    /// SignalR WebSocket connections cannot use cookies, so the client must pass the token via query string.
+    /// </summary>
+    [Authorize]
+    [HttpGet("signalr-token")]
+    [ProducesResponseType(typeof(SignalRTokenResponse), 200)]
+    [ProducesResponseType(401)]
+    public IActionResult GetSignalRToken()
+    {
+        var token = Request.Cookies[Constants.Authentication.AccessTokenCookieKey];
+        if (string.IsNullOrEmpty(token))
+        {
+            return Unauthorized();
+        }
+        return Ok(new SignalRTokenResponse(token));
     }
 
     [HttpGet("refresh")]
@@ -86,13 +103,15 @@ public class AuthController(
             return BadRequest("Authentication failed");
         }
 
-        var id = result.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var email = result.Principal.FindFirst(ClaimTypes.Email)?.Value;
-        var name = result.Principal.FindFirst(ClaimTypes.Name)?.Value;
+        var id = result.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        var email = result.Principal.FindFirstValue(ClaimTypes.Email);
+        var name = result.Principal.FindFirstValue(ClaimTypes.Name);
 
         string applicationBaseUrl =
             Configuration[Constants.AppUrlConfigurationKey]
-            ?? throw new InvalidConfigurationException($"{Constants.AppUrlConfigurationKey} is not configured");
+            ?? throw new InvalidConfigurationException(
+                $"{Constants.AppUrlConfigurationKey} is not configured"
+            );
         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
         {
             return Redirect($"{applicationBaseUrl}/auth/error?message=missing_claims");

@@ -7,8 +7,6 @@ public record JoinRoomRequest(string RoomCode, int DeckId);
 
 public record KickPlayerRequest(string RoomCode, string Username);
 
-public record AssignTeamRequest(string RoomCode, string UserId, Team Team);
-
 public record DrawCardRequest(string RoomCode, int Count = 1);
 
 public record PlayCardRequest(string RoomCode, Guid CardInstanceId, int? ZonePosition = null);
@@ -22,16 +20,16 @@ public record GameRoomDto(
     string RoomCode,
     RoomType RoomType,
     GameState State,
-    int CurrentTurn,
     IEnumerable<GamePlayerDto> Players
 );
 
 public record GamePlayerDto(
     string Username,
     string DeckName,
-    Team Team,
+    Enums.Alignment Alignment,
     bool IsHost,
     bool IsConnected,
+    int Force,
     IEnumerable<CardInstanceDto> Hand,
     int DeckSize,
     Dictionary<string, IEnumerable<CardInstanceDto>> Arenas,
@@ -43,6 +41,7 @@ public record CardInstanceDto(
     int CardId,
     string CardName,
     string? CardImageUrl,
+    int CardType,
     bool IsTapped
 );
 
@@ -63,7 +62,7 @@ public record RoomStateResponse(
 public record PlayerStateResponse(
     string UserId,
     string DisplayName,
-    Team Team,
+    Enums.Alignment Alignment,
     bool IsConnected,
     int CardsInDeck,
     int CardsInHand,
@@ -74,7 +73,7 @@ public record PlayerStateResponse(
 public record MyPlayerStateResponse(
     string UserId,
     string DisplayName,
-    Team Team,
+    Enums.Alignment Alignment,
     IEnumerable<CardInstanceDto> Hand,
     IEnumerable<CardInstanceDto> PlayArea,
     IEnumerable<CardInstanceDto> DiscardPile,
@@ -84,13 +83,11 @@ public record MyPlayerStateResponse(
 public record DiceRollResponse(string UserId, string DisplayName, int[] Results, int Total);
 
 // Event DTOs (for SignalR broadcasts)
-public record PlayerJoinedEvent(string UserId, string DisplayName, Team Team);
+public record PlayerJoinedEvent(string UserId, string DisplayName, Enums.Alignment Alignment);
 
 public record PlayerLeftEvent(string UserId, string DisplayName);
 
 public record PlayerKickedEvent(string UserId, string DisplayName, string Reason);
-
-public record TeamAssignedEvent(string UserId, Team Team);
 
 public record GameStartedEvent(string FirstTurnUserId);
 

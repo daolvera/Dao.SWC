@@ -1,6 +1,14 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Alignment } from '../../models/dtos/card.dto';
 import { DeckListItemDto } from '../../models/dtos/deck.dto';
 import { RoomType } from '../../models/dtos/game.dto';
 import { DeckService } from '../../services/deck.service';
@@ -73,16 +81,49 @@ import { GameHubService } from '../../services/game-hub.service';
                       <a routerLink="/decks">Build a deck</a> first.
                     </div>
                   } @else {
-                    <select class="form-select" formControlName="deckId">
+                    <select
+                      class="form-select"
+                      formControlName="deckId"
+                      (change)="onCreateDeckChange()"
+                    >
                       <option [value]="null" disabled>Choose a deck...</option>
                       @for (deck of validDecks(); track deck.id) {
                         <option [value]="deck.id">
-                          {{ deck.name }} ({{ deck.alignment === 0 ? 'Dark' : 'Light' }})
+                          {{ deck.name }} ({{ getAlignmentLabel(deck.alignment) }})
                         </option>
                       }
                     </select>
                   }
                 </div>
+
+                @if (createSelectedDeckIsNeutral()) {
+                  <div class="mb-3">
+                    <label class="form-label">Play As</label>
+                    <div class="alert alert-info py-2 mb-2">
+                      <small>Neutral decks must choose a side to play as.</small>
+                    </div>
+                    <div class="btn-group w-100" role="group">
+                      <input
+                        type="radio"
+                        class="btn-check"
+                        id="createPlayAsLight"
+                        [value]="Alignment.Light"
+                        formControlName="playAsAlignment"
+                      />
+                      <label class="btn btn-outline-primary" for="createPlayAsLight"
+                        >Light Side</label
+                      >
+                      <input
+                        type="radio"
+                        class="btn-check"
+                        id="createPlayAsDark"
+                        [value]="Alignment.Dark"
+                        formControlName="playAsAlignment"
+                      />
+                      <label class="btn btn-outline-dark" for="createPlayAsDark">Dark Side</label>
+                    </div>
+                  </div>
+                }
 
                 <button
                   type="submit"
@@ -130,16 +171,49 @@ import { GameHubService } from '../../services/game-hub.service';
                       <a routerLink="/decks">Build a deck</a> first.
                     </div>
                   } @else {
-                    <select class="form-select" formControlName="deckId">
+                    <select
+                      class="form-select"
+                      formControlName="deckId"
+                      (change)="onJoinDeckChange()"
+                    >
                       <option [value]="null" disabled>Choose a deck...</option>
                       @for (deck of validDecks(); track deck.id) {
                         <option [value]="deck.id">
-                          {{ deck.name }} ({{ deck.alignment === 0 ? 'Dark' : 'Light' }})
+                          {{ deck.name }} ({{ getAlignmentLabel(deck.alignment) }})
                         </option>
                       }
                     </select>
                   }
                 </div>
+
+                @if (joinSelectedDeckIsNeutral()) {
+                  <div class="mb-3">
+                    <label class="form-label">Play As</label>
+                    <div class="alert alert-info py-2 mb-2">
+                      <small>Neutral decks must choose a side to play as.</small>
+                    </div>
+                    <div class="btn-group w-100" role="group">
+                      <input
+                        type="radio"
+                        class="btn-check"
+                        id="joinPlayAsLight"
+                        [value]="Alignment.Light"
+                        formControlName="playAsAlignment"
+                      />
+                      <label class="btn btn-outline-primary" for="joinPlayAsLight"
+                        >Light Side</label
+                      >
+                      <input
+                        type="radio"
+                        class="btn-check"
+                        id="joinPlayAsDark"
+                        [value]="Alignment.Dark"
+                        formControlName="playAsAlignment"
+                      />
+                      <label class="btn btn-outline-dark" for="joinPlayAsDark">Dark Side</label>
+                    </div>
+                  </div>
+                }
 
                 <button
                   type="submit"
@@ -162,6 +236,7 @@ import { GameHubService } from '../../services/game-hub.service';
 })
 export class LobbyComponent implements OnInit {
   protected readonly RoomType = RoomType;
+  protected readonly Alignment = Alignment;
 
   private router = inject(Router);
   private deckService = inject(DeckService);
@@ -175,10 +250,30 @@ export class LobbyComponent implements OnInit {
   joining = signal(false);
   error = signal<string | null>(null);
 
+  // Track selected deck for neutral detection
+  createSelectedDeckId = signal<number | null>(null);
+  joinSelectedDeckId = signal<number | null>(null);
+
+  // Computed signals for neutral deck detection
+  createSelectedDeckIsNeutral = computed(() => {
+    const deckId = this.createSelectedDeckId();
+    if (!deckId) return false;
+    const deck = this.validDecks().find((d) => d.id === deckId);
+    return deck?.alignment === Alignment.Neutral;
+  });
+
+  joinSelectedDeckIsNeutral = computed(() => {
+    const deckId = this.joinSelectedDeckId();
+    if (!deckId) return false;
+    const deck = this.validDecks().find((d) => d.id === deckId);
+    return deck?.alignment === Alignment.Neutral;
+  });
+
   // Forms
   createForm = new FormGroup({
     roomType: new FormControl<RoomType>(RoomType.OneVOne, { nonNullable: true }),
     deckId: new FormControl<number | null>(null, [Validators.required]),
+    playAsAlignment: new FormControl<Alignment | null>(null),
   });
 
   joinForm = new FormGroup({
@@ -188,6 +283,7 @@ export class LobbyComponent implements OnInit {
       Validators.maxLength(6),
     ]),
     deckId: new FormControl<number | null>(null, [Validators.required]),
+    playAsAlignment: new FormControl<Alignment | null>(null),
   });
 
   ngOnInit(): void {
@@ -217,16 +313,56 @@ export class LobbyComponent implements OnInit {
     }
   }
 
+  getAlignmentLabel(alignment: Alignment): string {
+    switch (alignment) {
+      case Alignment.Light:
+        return 'Light';
+      case Alignment.Dark:
+        return 'Dark';
+      case Alignment.Neutral:
+        return 'Neutral';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  onCreateDeckChange(): void {
+    const rawValue = this.createForm.get('deckId')?.value;
+    const deckId = rawValue != null ? Number(rawValue) : null;
+    this.createSelectedDeckId.set(deckId);
+    // Reset playAsAlignment when deck changes
+    this.createForm.get('playAsAlignment')?.reset();
+  }
+
+  onJoinDeckChange(): void {
+    const rawValue = this.joinForm.get('deckId')?.value;
+    const deckId = rawValue != null ? Number(rawValue) : null;
+
+    this.joinSelectedDeckId.set(deckId);
+    // Reset playAsAlignment when deck changes
+    this.joinForm.get('playAsAlignment')?.reset();
+  }
+
   async createRoom(): Promise<void> {
     if (this.createForm.invalid) return;
+
+    // Validate that neutral decks have a playAsAlignment selected
+    if (this.createSelectedDeckIsNeutral() && !this.createForm.get('playAsAlignment')?.value) {
+      this.error.set('Please select Light or Dark side for your neutral deck');
+      return;
+    }
 
     this.creating.set(true);
     this.error.set(null);
 
-    const { roomType, deckId } = this.createForm.value;
+    const { roomType, deckId, playAsAlignment } = this.createForm.value;
 
     try {
-      const roomCode = await this.gameHub.createRoom(roomType!, deckId!);
+      const roomCode = await this.gameHub.createRoom(
+        roomType!,
+        Number(deckId)!,
+        playAsAlignment ?? undefined,
+      );
       this.router.navigate(['/play', roomCode]);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to create room');
@@ -237,13 +373,23 @@ export class LobbyComponent implements OnInit {
   async joinRoom(): Promise<void> {
     if (this.joinForm.invalid) return;
 
+    // Validate that neutral decks have a playAsAlignment selected
+    if (this.joinSelectedDeckIsNeutral() && !this.joinForm.get('playAsAlignment')?.value) {
+      this.error.set('Please select Light or Dark side for your neutral deck');
+      return;
+    }
+
     this.joining.set(true);
     this.error.set(null);
 
-    const { roomCode, deckId } = this.joinForm.value;
+    const { roomCode, deckId, playAsAlignment } = this.joinForm.value;
 
     try {
-      await this.gameHub.joinRoom(roomCode!.toUpperCase(), deckId!);
+      await this.gameHub.joinRoom(
+        roomCode!.toUpperCase(),
+        Number(deckId)!,
+        playAsAlignment ?? undefined,
+      );
       this.router.navigate(['/play', roomCode!.toUpperCase()]);
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Failed to join room');

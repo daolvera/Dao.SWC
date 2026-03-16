@@ -62,3 +62,15 @@ public record DiceRollResult(
     int Total,
     DateTime RolledAt
 );
+
+/// <summary>
+/// Result of a join room operation.
+/// </summary>
+public record JoinRoomResult(GameRoom? Room, string? Error)
+{
+    public bool Success => Room != null && Error == null;
+
+    public static JoinRoomResult Succeeded(GameRoom room) => new(room, null);
+
+    public static JoinRoomResult Failed(string error) => new(null, error);
+}

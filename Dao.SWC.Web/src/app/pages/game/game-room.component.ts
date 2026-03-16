@@ -10,17 +10,18 @@ import {
   signal,
   ViewChild,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import {
   CardInstanceDto,
+  DiceRolledEvent,
   GamePlayerDto,
   GameRoomDto,
   GameState,
   RoomType,
-  Team,
 } from '../../models/dtos/game.dto';
+import { Alignment } from '../../models/dtos/card.dto';
 import { GameHubService } from '../../services/game-hub.service';
 
 type CardZone = 'deck' | 'hand' | 'space' | 'ground' | 'character' | 'discard';
@@ -29,6 +30,9 @@ interface DraggedCard {
   card: CardInstanceDto;
   sourceZone: CardZone;
 }
+
+// CardType enum values
+const CARD_TYPE_UNIT = 0;
 
 @Component({
   selector: 'app-game-room',
@@ -46,9 +50,6 @@ interface DraggedCard {
             <span class="badge" [class]="stateBadgeClass()">
               {{ stateLabel() }}
             </span>
-            @if (room()!.state === GameState.InProgress) {
-              <span class="badge bg-secondary">Turn: {{ room()!.currentTurn }}</span>
-            }
           </div>
           <div class="d-flex align-items-center gap-2">
             @if (room()!.state === GameState.Waiting && isHost()) {
@@ -88,36 +89,16 @@ interface DraggedCard {
                         }
                       </div>
                       <div class="deck-name">{{ player.deckName }}</div>
-                      @if (room()!.roomType !== RoomType.OneVOne) {
-                        <div class="team-badge">
-                          <span
-                            class="badge"
-                            [class]="player.team === Team.Alpha ? 'bg-danger' : 'bg-primary'"
-                          >
-                            Team {{ player.team === Team.Alpha ? 'Alpha' : 'Beta' }}
-                          </span>
-                          @if (isHost() && !player.isHost) {
-                            <div class="team-controls mt-2">
-                              <button
-                                class="btn btn-sm"
-                                [class.btn-danger]="player.team === Team.Alpha"
-                                [class.btn-outline-danger]="player.team !== Team.Alpha"
-                                (click)="assignTeam(player.username, Team.Alpha)"
-                              >
-                                α
-                              </button>
-                              <button
-                                class="btn btn-sm"
-                                [class.btn-primary]="player.team === Team.Beta"
-                                [class.btn-outline-primary]="player.team !== Team.Beta"
-                                (click)="assignTeam(player.username, Team.Beta)"
-                              >
-                                β
-                              </button>
-                            </div>
-                          }
-                        </div>
-                      }
+                      <div class="alignment-badge">
+                        <span
+                          class="badge"
+                          [class]="
+                            player.alignment === Alignment.Light ? 'bg-primary' : 'bg-danger'
+                          "
+                        >
+                          {{ player.alignment === Alignment.Light ? 'Light Side' : 'Dark Side' }}
+                        </span>
+                      </div>
                       @if (isHost() && !player.isHost) {
                         <button
                           class="btn btn-outline-danger btn-sm mt-2"
@@ -143,97 +124,311 @@ interface DraggedCard {
             </div>
           }
 
-          <!-- In-Progress State: Tabletop Simulator -->
+          <!-- In-Progress State: Two-sided board -->
           @if (room()!.state === GameState.InProgress) {
-            <!-- Arenas Container -->
-            <div class="arenas-container">
-              <!-- Space Arena -->
-              <div
-                class="arena space-arena"
-                (dragover)="onDragOver($event)"
-                (drop)="onDrop($event, 'space')"
-                [class.drag-over]="dragOverZone() === 'space'"
-              >
-                <div class="arena-label">SPACE ARENA</div>
-                <div class="arena-cards">
-                  @for (card of getZoneCards('space'); track card.instanceId) {
-                    <div
-                      class="game-card"
-                      [class.tapped]="card.isTapped"
-                      [class.selected]="selectedCard() === card.instanceId"
-                      draggable="true"
-                      (dragstart)="onDragStart($event, card, 'space')"
-                      (dragend)="onDragEnd()"
-                      (click)="selectCard(card.instanceId)"
-                      (dblclick)="toggleTap(card)"
-                    >
-                      <img
-                        [src]="card.cardImageUrl || 'assets/card-back.png'"
-                        [alt]="card.cardName"
-                      />
-                      <div class="card-name">{{ card.cardName }}</div>
+            <div class="board-container">
+              <!-- Opponents Section (Top) -->
+              <div class="opponents-section">
+                @for (opponent of opponents(); track opponent.username) {
+                  <div class="player-board opponent-board">
+                    <!-- Opponent Info Bar -->
+                    <div class="player-info-bar opponent">
+                      <span class="player-name">{{ opponent.username }}</span>
+                      <span class="force-display">
+                        <span class="force-icon">⚡</span>
+                        <span class="force-value">{{ opponent.force }}</span>
+                      </span>
+                      <span class="card-counts">
+                        <span title="Hand">🃏 {{ opponent.hand.length }}</span>
+                        <span title="Deck">📚 {{ opponent.deckSize }}</span>
+                      </span>
                     </div>
-                  }
-                </div>
+                    <!-- Opponent Arenas -->
+                    <div class="arenas-row">
+                      <!-- Character Arena -->
+                      <div class="arena character-arena">
+                        <div class="arena-label">CHARACTER</div>
+                        <div class="arena-content">
+                          <div class="units-section">
+                            @for (
+                              card of getPlayerArenaUnits(opponent, 'character');
+                              track card.instanceId
+                            ) {
+                              <div class="game-card small" [class.tapped]="card.isTapped">
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                  [alt]="card.cardName"
+                                />
+                              </div>
+                            }
+                          </div>
+                          <div class="others-section">
+                            @for (
+                              card of getPlayerArenaOthers(opponent, 'character');
+                              track card.instanceId
+                            ) {
+                              <div class="game-card tiny" [class.tapped]="card.isTapped">
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                  [alt]="card.cardName"
+                                />
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      <!-- Ground Arena -->
+                      <div class="arena ground-arena">
+                        <div class="arena-label">GROUND</div>
+                        <div class="arena-content">
+                          <div class="units-section">
+                            @for (
+                              card of getPlayerArenaUnits(opponent, 'ground');
+                              track card.instanceId
+                            ) {
+                              <div class="game-card small" [class.tapped]="card.isTapped">
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                  [alt]="card.cardName"
+                                />
+                              </div>
+                            }
+                          </div>
+                          <div class="others-section">
+                            @for (
+                              card of getPlayerArenaOthers(opponent, 'ground');
+                              track card.instanceId
+                            ) {
+                              <div class="game-card tiny" [class.tapped]="card.isTapped">
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                  [alt]="card.cardName"
+                                />
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                      <!-- Space Arena -->
+                      <div class="arena space-arena">
+                        <div class="arena-label">SPACE</div>
+                        <div class="arena-content">
+                          <div class="units-section">
+                            @for (
+                              card of getPlayerArenaUnits(opponent, 'space');
+                              track card.instanceId
+                            ) {
+                              <div class="game-card small" [class.tapped]="card.isTapped">
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                  [alt]="card.cardName"
+                                />
+                              </div>
+                            }
+                          </div>
+                          <div class="others-section">
+                            @for (
+                              card of getPlayerArenaOthers(opponent, 'space');
+                              track card.instanceId
+                            ) {
+                              <div class="game-card tiny" [class.tapped]="card.isTapped">
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                  [alt]="card.cardName"
+                                />
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
               </div>
 
-              <!-- Ground Arena -->
-              <div
-                class="arena ground-arena"
-                (dragover)="onDragOver($event)"
-                (drop)="onDrop($event, 'ground')"
-                [class.drag-over]="dragOverZone() === 'ground'"
-              >
-                <div class="arena-label">GROUND ARENA</div>
-                <div class="arena-cards">
-                  @for (card of getZoneCards('ground'); track card.instanceId) {
-                    <div
-                      class="game-card"
-                      [class.tapped]="card.isTapped"
-                      [class.selected]="selectedCard() === card.instanceId"
-                      draggable="true"
-                      (dragstart)="onDragStart($event, card, 'ground')"
-                      (dragend)="onDragEnd()"
-                      (click)="selectCard(card.instanceId)"
-                      (dblclick)="toggleTap(card)"
-                    >
-                      <img
-                        [src]="card.cardImageUrl || 'assets/card-back.png'"
-                        [alt]="card.cardName"
+              <!-- Player Section (Bottom) -->
+              <div class="player-section">
+                <div class="player-board my-board">
+                  <!-- Player Info Bar -->
+                  <div class="player-info-bar me">
+                    <span class="player-name">{{ myPlayer()?.username }}</span>
+                    <div class="force-control">
+                      <span class="force-icon">⚡</span>
+                      <button
+                        class="btn btn-sm btn-outline-light force-btn"
+                        (click)="decrementForce()"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        class="force-input"
+                        [value]="myPlayer()?.force ?? 4"
+                        (change)="onForceChange($event)"
+                        min="0"
+                        max="99"
                       />
-                      <div class="card-name">{{ card.cardName }}</div>
+                      <button
+                        class="btn btn-sm btn-outline-light force-btn"
+                        (click)="incrementForce()"
+                      >
+                        +
+                      </button>
                     </div>
-                  }
-                </div>
-              </div>
-
-              <!-- Character Arena -->
-              <div
-                class="arena character-arena"
-                (dragover)="onDragOver($event)"
-                (drop)="onDrop($event, 'character')"
-                [class.drag-over]="dragOverZone() === 'character'"
-              >
-                <div class="arena-label">CHARACTER ARENA</div>
-                <div class="arena-cards">
-                  @for (card of getZoneCards('character'); track card.instanceId) {
+                  </div>
+                  <!-- Player Arenas -->
+                  <div class="arenas-row">
+                    <!-- Character Arena -->
                     <div
-                      class="game-card"
-                      [class.tapped]="card.isTapped"
-                      [class.selected]="selectedCard() === card.instanceId"
-                      draggable="true"
-                      (dragstart)="onDragStart($event, card, 'character')"
-                      (dragend)="onDragEnd()"
-                      (click)="selectCard(card.instanceId)"
-                      (dblclick)="toggleTap(card)"
+                      class="arena character-arena"
+                      (dragover)="onDragOver($event)"
+                      (drop)="onDrop($event, 'character')"
+                      [class.drag-over]="dragOverZone() === 'character'"
                     >
-                      <img
-                        [src]="card.cardImageUrl || 'assets/card-back.png'"
-                        [alt]="card.cardName"
-                      />
-                      <div class="card-name">{{ card.cardName }}</div>
+                      <div class="arena-label">CHARACTER</div>
+                      <div class="arena-content">
+                        <div class="units-section">
+                          @for (card of myArenaUnits('character'); track card.instanceId) {
+                            <div
+                              class="game-card"
+                              [class.tapped]="card.isTapped"
+                              [class.selected]="selectedCard() === card.instanceId"
+                              draggable="true"
+                              (dragstart)="onDragStart($event, card, 'character')"
+                              (dragend)="onDragEnd()"
+                              (click)="selectCard(card.instanceId)"
+                              (dblclick)="toggleTap(card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                [alt]="card.cardName"
+                              />
+                              <div class="card-name">{{ card.cardName }}</div>
+                            </div>
+                          }
+                        </div>
+                        <div class="others-section">
+                          @for (card of myArenaOthers('character'); track card.instanceId) {
+                            <div
+                              class="game-card small"
+                              [class.tapped]="card.isTapped"
+                              [class.selected]="selectedCard() === card.instanceId"
+                              draggable="true"
+                              (dragstart)="onDragStart($event, card, 'character')"
+                              (dragend)="onDragEnd()"
+                              (click)="selectCard(card.instanceId)"
+                              (dblclick)="toggleTap(card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                [alt]="card.cardName"
+                              />
+                            </div>
+                          }
+                        </div>
+                      </div>
                     </div>
-                  }
+                    <!-- Ground Arena -->
+                    <div
+                      class="arena ground-arena"
+                      (dragover)="onDragOver($event)"
+                      (drop)="onDrop($event, 'ground')"
+                      [class.drag-over]="dragOverZone() === 'ground'"
+                    >
+                      <div class="arena-label">GROUND</div>
+                      <div class="arena-content">
+                        <div class="units-section">
+                          @for (card of myArenaUnits('ground'); track card.instanceId) {
+                            <div
+                              class="game-card"
+                              [class.tapped]="card.isTapped"
+                              [class.selected]="selectedCard() === card.instanceId"
+                              draggable="true"
+                              (dragstart)="onDragStart($event, card, 'ground')"
+                              (dragend)="onDragEnd()"
+                              (click)="selectCard(card.instanceId)"
+                              (dblclick)="toggleTap(card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                [alt]="card.cardName"
+                              />
+                              <div class="card-name">{{ card.cardName }}</div>
+                            </div>
+                          }
+                        </div>
+                        <div class="others-section">
+                          @for (card of myArenaOthers('ground'); track card.instanceId) {
+                            <div
+                              class="game-card small"
+                              [class.tapped]="card.isTapped"
+                              [class.selected]="selectedCard() === card.instanceId"
+                              draggable="true"
+                              (dragstart)="onDragStart($event, card, 'ground')"
+                              (dragend)="onDragEnd()"
+                              (click)="selectCard(card.instanceId)"
+                              (dblclick)="toggleTap(card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                [alt]="card.cardName"
+                              />
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Space Arena -->
+                    <div
+                      class="arena space-arena"
+                      (dragover)="onDragOver($event)"
+                      (drop)="onDrop($event, 'space')"
+                      [class.drag-over]="dragOverZone() === 'space'"
+                    >
+                      <div class="arena-label">SPACE</div>
+                      <div class="arena-content">
+                        <div class="units-section">
+                          @for (card of myArenaUnits('space'); track card.instanceId) {
+                            <div
+                              class="game-card"
+                              [class.tapped]="card.isTapped"
+                              [class.selected]="selectedCard() === card.instanceId"
+                              draggable="true"
+                              (dragstart)="onDragStart($event, card, 'space')"
+                              (dragend)="onDragEnd()"
+                              (click)="selectCard(card.instanceId)"
+                              (dblclick)="toggleTap(card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                [alt]="card.cardName"
+                              />
+                              <div class="card-name">{{ card.cardName }}</div>
+                            </div>
+                          }
+                        </div>
+                        <div class="others-section">
+                          @for (card of myArenaOthers('space'); track card.instanceId) {
+                            <div
+                              class="game-card small"
+                              [class.tapped]="card.isTapped"
+                              [class.selected]="selectedCard() === card.instanceId"
+                              draggable="true"
+                              (dragstart)="onDragStart($event, card, 'space')"
+                              (dragend)="onDragEnd()"
+                              (click)="selectCard(card.instanceId)"
+                              (dblclick)="toggleTap(card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.png'"
+                                [alt]="card.cardName"
+                              />
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -243,7 +438,7 @@ interface DraggedCard {
               <!-- Left: Deck -->
               <div
                 class="zone deck-zone"
-                (click)="drawCards(1)"
+                (click)="drawCard()"
                 (dragover)="onDragOver($event)"
                 (drop)="onDrop($event, 'deck')"
                 [class.drag-over]="dragOverZone() === 'deck'"
@@ -314,7 +509,7 @@ interface DraggedCard {
               <div class="modal-overlay" (click)="showDiscard.set(false)">
                 <div class="modal-content" (click)="$event.stopPropagation()">
                   <h4>Discard Pile</h4>
-                  <div class="discard-cards">
+                  <div class="modal-cards">
                     @for (card of myDiscard(); track card.instanceId) {
                       <div
                         class="game-card"
@@ -339,6 +534,35 @@ interface DraggedCard {
               </div>
             }
 
+            <!-- Deck Browser Modal -->
+            @if (showDeckBrowser()) {
+              <div class="modal-overlay" (click)="showDeckBrowser.set(false)">
+                <div class="modal-content large" (click)="$event.stopPropagation()">
+                  <h4>Browse Deck ({{ deckBrowserCards().length }} cards)</h4>
+                  <div class="modal-cards scrollable">
+                    @for (card of deckBrowserCards(); track card.instanceId) {
+                      <div
+                        class="game-card clickable"
+                        (click)="takeCardFromDeck(card.instanceId)"
+                        [title]="'Click to take ' + card.cardName + ' to hand'"
+                      >
+                        <img
+                          [src]="card.cardImageUrl || 'assets/card-back.png'"
+                          [alt]="card.cardName"
+                        />
+                        <div class="card-name">{{ card.cardName }}</div>
+                      </div>
+                    } @empty {
+                      <p class="text-muted">Deck is empty</p>
+                    }
+                  </div>
+                  <button class="btn btn-secondary mt-3" (click)="showDeckBrowser.set(false)">
+                    Close
+                  </button>
+                </div>
+              </div>
+            }
+
             <!-- Side Panel -->
             <div class="side-panel" [class.collapsed]="sidePanelCollapsed()">
               <button class="panel-toggle" (click)="sidePanelCollapsed.set(!sidePanelCollapsed())">
@@ -350,16 +574,10 @@ interface DraggedCard {
                   <div class="panel-section">
                     <h6>Actions</h6>
                     <div class="d-grid gap-1">
-                      <button class="btn btn-sm btn-primary" (click)="drawCards(1)">
-                        Draw Card
+                      <button class="btn btn-sm btn-primary" (click)="drawCard()">Draw Card</button>
+                      <button class="btn btn-sm btn-outline-primary" (click)="openDeckBrowser()">
+                        View Deck
                       </button>
-                      <button class="btn btn-sm btn-outline-primary" (click)="drawCards(5)">
-                        Draw 5
-                      </button>
-                      <button class="btn btn-sm btn-warning" (click)="shuffleDeck()">
-                        Shuffle Deck
-                      </button>
-                      <button class="btn btn-sm btn-secondary" (click)="endTurn()">End Turn</button>
                     </div>
                   </div>
 
@@ -376,9 +594,12 @@ interface DraggedCard {
                       />
                       <button class="btn btn-outline-primary" (click)="rollDice()">Roll</button>
                     </div>
-                    @if (lastDiceRoll().length > 0) {
+                    @if (lastDiceRoll()) {
                       <div class="dice-results mt-2">
-                        @for (result of lastDiceRoll(); track $index) {
+                        <div class="small text-info mb-1">
+                          {{ lastDiceRoll()!.username }} rolled:
+                        </div>
+                        @for (result of lastDiceRoll()!.results; track $index) {
                           <span class="badge bg-dark me-1">{{ result }}</span>
                         }
                         <div class="small text-muted">Total: {{ diceTotal() }}</div>
@@ -453,6 +674,7 @@ interface DraggedCard {
         padding: 0.5rem 1rem;
         background: rgba(0, 0, 0, 0.5);
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        flex-shrink: 0;
       }
 
       .room-code {
@@ -470,7 +692,7 @@ interface DraggedCard {
         overflow: hidden;
       }
 
-      /* Waiting Overlay */
+      /* Waiting/Loading Overlays */
       .waiting-overlay,
       .loading-overlay {
         position: absolute;
@@ -533,13 +755,124 @@ interface DraggedCard {
         opacity: 0.8;
       }
 
-      /* Arenas */
-      .arenas-container {
+      /* Board Container - Two-sided layout */
+      .board-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0.5rem;
+        gap: 0.5rem;
+      }
+
+      .opponents-section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        overflow: hidden;
+      }
+
+      .player-section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .player-board {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 0.5rem;
+        overflow: hidden;
+      }
+
+      .opponent-board {
+        border: 1px solid rgba(255, 100, 100, 0.3);
+      }
+
+      .my-board {
+        border: 1px solid rgba(100, 200, 255, 0.3);
+      }
+
+      /* Player Info Bar */
+      .player-info-bar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(0, 0, 0, 0.4);
+        font-size: 0.85rem;
+      }
+
+      .player-info-bar.opponent {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .player-info-bar.me {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .force-display {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        color: #ffd700;
+      }
+
+      .force-icon {
+        font-size: 1rem;
+      }
+
+      .force-value {
+        font-weight: bold;
+        font-size: 1.1rem;
+      }
+
+      .force-control {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+
+      .force-btn {
+        padding: 0.1rem 0.4rem;
+        font-size: 1rem;
+        line-height: 1;
+      }
+
+      .force-input {
+        width: 50px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        color: #ffd700;
+        font-weight: bold;
+        font-size: 1rem;
+      }
+
+      .force-input:focus {
+        outline: none;
+        border-color: #ffd700;
+      }
+
+      .card-counts {
+        display: flex;
+        gap: 0.5rem;
+        opacity: 0.8;
+        font-size: 0.8rem;
+      }
+
+      /* Arenas Row */
+      .arenas-row {
         flex: 1;
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 0.5rem;
-        padding: 0.5rem;
+        gap: 0.25rem;
+        padding: 0.25rem;
         min-height: 0;
       }
 
@@ -547,8 +880,8 @@ interface DraggedCard {
         display: flex;
         flex-direction: column;
         background: rgba(0, 0, 0, 0.3);
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        border-radius: 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 0.25rem;
         overflow: hidden;
         transition:
           border-color 0.2s,
@@ -561,23 +894,23 @@ interface DraggedCard {
       }
 
       .space-arena {
-        border-color: rgba(138, 43, 226, 0.5);
+        border-color: rgba(138, 43, 226, 0.4);
       }
 
       .ground-arena {
-        border-color: rgba(34, 139, 34, 0.5);
+        border-color: rgba(34, 139, 34, 0.4);
       }
 
       .character-arena {
-        border-color: rgba(255, 215, 0, 0.5);
+        border-color: rgba(255, 215, 0, 0.4);
       }
 
       .arena-label {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
+        padding: 0.15rem 0.25rem;
+        font-size: 0.65rem;
         font-weight: bold;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.05em;
         background: rgba(0, 0, 0, 0.5);
         text-align: center;
       }
@@ -594,14 +927,36 @@ interface DraggedCard {
         background: rgba(255, 215, 0, 0.3);
       }
 
-      .arena-cards {
+      /* Arena Content - Units (9/12) and Others (3/12) split */
+      .arena-content {
         flex: 1;
         display: flex;
+        gap: 2px;
+        padding: 2px;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .units-section {
+        flex: 9;
+        display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 0.5rem;
-        overflow-y: auto;
+        gap: 3px;
         align-content: flex-start;
+        overflow-y: auto;
+        padding: 2px;
+      }
+
+      .others-section {
+        flex: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        align-items: center;
+        overflow-y: auto;
+        padding: 2px;
+        background: rgba(0, 0, 0, 0.2);
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       /* Bottom Area */
@@ -611,7 +966,8 @@ interface DraggedCard {
         padding: 0.5rem;
         background: rgba(0, 0, 0, 0.5);
         border-top: 1px solid rgba(255, 255, 255, 0.1);
-        height: 180px;
+        height: 160px;
+        flex-shrink: 0;
       }
 
       .zone {
@@ -717,7 +1073,7 @@ interface DraggedCard {
       }
 
       .game-card:hover {
-        transform: translateY(-5px);
+        transform: translateY(-3px);
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
         z-index: 10;
       }
@@ -737,8 +1093,21 @@ interface DraggedCard {
       }
 
       .game-card.small {
-        width: 60px;
-        height: 84px;
+        width: 50px;
+        height: 70px;
+      }
+
+      .game-card.tiny {
+        width: 35px;
+        height: 49px;
+      }
+
+      .game-card.clickable {
+        cursor: pointer;
+      }
+
+      .game-card.clickable:hover {
+        border-color: #28a745;
       }
 
       .game-card img {
@@ -754,8 +1123,8 @@ interface DraggedCard {
         right: 0;
         background: rgba(0, 0, 0, 0.8);
         color: white;
-        font-size: 0.6rem;
-        padding: 2px 4px;
+        font-size: 0.55rem;
+        padding: 1px 2px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -766,8 +1135,8 @@ interface DraggedCard {
         position: absolute;
         right: 0;
         top: 50px;
-        bottom: 180px;
-        width: 200px;
+        bottom: 160px;
+        width: 180px;
         background: rgba(0, 0, 0, 0.8);
         border-left: 1px solid rgba(255, 255, 255, 0.1);
         transition: transform 0.3s;
@@ -775,7 +1144,7 @@ interface DraggedCard {
       }
 
       .side-panel.collapsed {
-        transform: translateX(200px);
+        transform: translateX(180px);
       }
 
       .panel-toggle {
@@ -842,20 +1211,31 @@ interface DraggedCard {
         overflow: auto;
       }
 
-      .discard-cards {
+      .modal-content.large {
+        width: 80vw;
+        max-width: 900px;
+      }
+
+      .modal-cards {
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
         max-width: 500px;
       }
+
+      .modal-cards.scrollable {
+        max-width: none;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
     `,
   ],
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, FormsModule],
 })
 export class GameRoomComponent implements OnInit, OnDestroy {
   protected readonly RoomType = RoomType;
   protected readonly GameState = GameState;
-  protected readonly Team = Team;
+  protected readonly Alignment = Alignment;
 
   @ViewChild('gameContainer') gameContainer!: ElementRef<HTMLElement>;
 
@@ -866,12 +1246,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   roomCode = '';
   room = signal<GameRoomDto | null>(null);
   selectedCard = signal<string | null>(null);
-  lastDiceRoll = signal<number[]>([]);
+  lastDiceRoll = signal<DiceRolledEvent | null>(null);
   diceCount = new FormControl(1, [Validators.min(1), Validators.max(20)]);
 
   isFullscreen = signal(false);
   sidePanelCollapsed = signal(false);
   showDiscard = signal(false);
+  showDeckBrowser = signal(false);
+  deckBrowserCards = signal<CardInstanceDto[]>([]);
   dragOverZone = signal<CardZone | null>(null);
 
   private draggedCard: DraggedCard | null = null;
@@ -883,6 +1265,18 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     if (!r) return false;
     const me = r.players.find((p) => p.username === this.gameHub.currentUser);
     return me?.isHost ?? false;
+  });
+
+  myPlayer = computed(() => {
+    const r = this.room();
+    if (!r) return null;
+    return r.players.find((p) => p.username === this.gameHub.currentUser) ?? null;
+  });
+
+  opponents = computed(() => {
+    const r = this.room();
+    if (!r) return [];
+    return r.players.filter((p) => p.username !== this.gameHub.currentUser);
   });
 
   maxPlayers = computed(() => {
@@ -911,7 +1305,6 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   canStart = computed(() => {
     const r = this.room();
     if (!r) return false;
-    // Allow starting with 2+ players
     return r.players.length >= 2;
   });
 
@@ -972,27 +1365,25 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   });
 
   myHand = computed(() => {
-    const r = this.room();
-    if (!r) return [];
-    const me = r.players.find((p) => p.username === this.gameHub.currentUser);
+    const me = this.myPlayer();
     return me?.hand ?? [];
   });
 
   myDeckSize = computed(() => {
-    const r = this.room();
-    if (!r) return 0;
-    const me = r.players.find((p) => p.username === this.gameHub.currentUser);
+    const me = this.myPlayer();
     return me?.deckSize ?? 0;
   });
 
   myDiscard = computed(() => {
-    const r = this.room();
-    if (!r) return [];
-    const me = r.players.find((p) => p.username === this.gameHub.currentUser);
+    const me = this.myPlayer();
     return me?.discardPile ?? [];
   });
 
-  diceTotal = computed(() => this.lastDiceRoll().reduce((sum, n) => sum + n, 0));
+  diceTotal = computed(() => {
+    const roll = this.lastDiceRoll();
+    if (!roll) return 0;
+    return roll.results.reduce((sum, n) => sum + n, 0);
+  });
 
   @HostListener('document:fullscreenchange')
   onFullscreenChange(): void {
@@ -1013,7 +1404,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         }
       }),
       this.gameHub.diceRolled$.subscribe((event) => {
-        this.lastDiceRoll.set(event.results);
+        this.lastDiceRoll.set(event);
       }),
       this.gameHub.kicked$.subscribe(() => {
         this.router.navigate(['/play']);
@@ -1047,25 +1438,30 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  getZoneCards(zone: CardZone): CardInstanceDto[] {
-    const r = this.room();
-    if (!r) return [];
+  // Get units (cardType === 0) from a player's arena
+  getPlayerArenaUnits(player: GamePlayerDto, arena: string): CardInstanceDto[] {
+    const arenaCards = player.arenas[arena] ?? [];
+    return arenaCards.filter((c) => c.cardType === CARD_TYPE_UNIT);
+  }
 
-    // Get current player's cards for this zone
-    const me = r.players.find((p) => p.username === this.gameHub.currentUser);
+  // Get non-units from a player's arena
+  getPlayerArenaOthers(player: GamePlayerDto, arena: string): CardInstanceDto[] {
+    const arenaCards = player.arenas[arena] ?? [];
+    return arenaCards.filter((c) => c.cardType !== CARD_TYPE_UNIT);
+  }
+
+  // Get my units for an arena
+  myArenaUnits(arena: string): CardInstanceDto[] {
+    const me = this.myPlayer();
     if (!me) return [];
+    return this.getPlayerArenaUnits(me, arena);
+  }
 
-    // For arenas, show all players' cards
-    if (zone === 'space' || zone === 'ground' || zone === 'character') {
-      const allCards: CardInstanceDto[] = [];
-      for (const player of r.players) {
-        const arenaCards = player.arenas[zone] ?? [];
-        allCards.push(...arenaCards);
-      }
-      return allCards;
-    }
-
-    return [];
+  // Get my non-units for an arena
+  myArenaOthers(arena: string): CardInstanceDto[] {
+    const me = this.myPlayer();
+    if (!me) return [];
+    return this.getPlayerArenaOthers(me, arena);
   }
 
   getPlayerCardCount(player: GamePlayerDto): number {
@@ -1078,6 +1474,41 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     } else {
       this.selectedCard.set(instanceId);
     }
+  }
+
+  // Force counter methods
+  async incrementForce(): Promise<void> {
+    const me = this.myPlayer();
+    if (me) {
+      await this.gameHub.updateForce(me.force + 1);
+    }
+  }
+
+  async decrementForce(): Promise<void> {
+    const me = this.myPlayer();
+    if (me && me.force > 0) {
+      await this.gameHub.updateForce(me.force - 1);
+    }
+  }
+
+  async onForceChange(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const value = parseInt(input.value, 10);
+    if (!isNaN(value)) {
+      await this.gameHub.updateForce(value);
+    }
+  }
+
+  // Deck browser
+  async openDeckBrowser(): Promise<void> {
+    const cards = await this.gameHub.viewDeck();
+    this.deckBrowserCards.set(cards);
+    this.showDeckBrowser.set(true);
+  }
+
+  async takeCardFromDeck(cardInstanceId: string): Promise<void> {
+    await this.gameHub.takeFromDeck(cardInstanceId);
+    this.showDeckBrowser.set(false);
   }
 
   // Drag and drop
@@ -1108,7 +1539,6 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
     if (sourceZone === targetZone) return;
 
-    // Move card to target zone
     await this.moveCard(card.instanceId, sourceZone, targetZone);
   }
 
@@ -1128,13 +1558,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   }
 
   async moveCard(cardId: string, from: CardZone, to: CardZone): Promise<void> {
-    // Map zones to hub method calls
     if (to === 'space' || to === 'ground' || to === 'character') {
       await this.gameHub.playCard(cardId, to);
     } else if (to === 'discard') {
       await this.gameHub.discardCard(cardId);
     } else if (to === 'hand') {
-      // Return card to hand (from arena or discard)
       await this.gameHub.returnToHand(cardId);
     }
   }
@@ -1147,25 +1575,13 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     await this.gameHub.startGame();
   }
 
-  async drawCards(count: number): Promise<void> {
-    await this.gameHub.drawCards(count);
-  }
-
-  async shuffleDeck(): Promise<void> {
-    await this.gameHub.shuffleDeck();
-  }
-
-  async endTurn(): Promise<void> {
-    await this.gameHub.endTurn();
+  async drawCard(): Promise<void> {
+    await this.gameHub.drawCards(1);
   }
 
   async rollDice(): Promise<void> {
     const count = this.diceCount.value ?? 1;
     await this.gameHub.rollDice(count);
-  }
-
-  async assignTeam(username: string, team: Team): Promise<void> {
-    await this.gameHub.assignTeam(username, team);
   }
 
   async kickPlayer(username: string): Promise<void> {

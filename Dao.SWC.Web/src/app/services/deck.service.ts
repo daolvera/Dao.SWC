@@ -15,7 +15,7 @@ import {
 })
 export class DeckService {
   private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}api/decks`;
+  private baseUrl = `${environment.apiUrl}/api/decks`;
 
   // Cached list of user's decks
   public userDecks = signal<DeckListItemDto[]>([]);

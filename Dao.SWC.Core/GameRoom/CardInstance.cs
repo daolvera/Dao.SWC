@@ -1,3 +1,5 @@
+using Dao.SWC.Core.Enums;
+
 namespace Dao.SWC.Core.GameRoom;
 
 /// <summary>
@@ -10,6 +12,11 @@ public class CardInstance
     public int CardId { get; set; }
     public string CardName { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
+
+    /// <summary>
+    /// The type of the card (Unit, Location, Equipment, Mission, Battle).
+    /// </summary>
+    public CardType CardType { get; set; }
     public CardZone Zone { get; set; } = CardZone.Deck;
 
     /// <summary>

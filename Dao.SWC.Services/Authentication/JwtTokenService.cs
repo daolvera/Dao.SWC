@@ -1,17 +1,19 @@
-﻿using Dao.SWC.Core.Authentication;
-using Dao.SWC.Core.Entities;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Dao.SWC.Core.Authentication;
+using Dao.SWC.Core.Entities;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Dao.SWC.Services.Authentication;
 
 public class JwtTokenService(
     IAppUserRepository appUserRepository,
-    IOptions<JwtOptions> jwtOptions
-    ) : ITokenService
+    IOptions<JwtOptions> jwtOptions,
+    UserManager<AppUser> userManager
+) : ITokenService
 {
     public async Task<TokenResponse> GenerateTokenAsync(AppUser user)
     {
@@ -20,8 +22,16 @@ public class JwtTokenService(
             new(ClaimTypes.NameIdentifier, user.Id),
             new(ClaimTypes.Email, user.Email!),
             new(JwtRegisteredClaimNames.Sub, user.UserName ?? string.Empty),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
+
+        // Add role claims to the token
+        var roles = await userManager.GetRolesAsync(user);
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
         var key = GetSecurityKey(jwtOptions.Value.Key);
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expires = DateTime.UtcNow.AddMinutes(jwtOptions.Value.AccessTokenExpiryMinutes);

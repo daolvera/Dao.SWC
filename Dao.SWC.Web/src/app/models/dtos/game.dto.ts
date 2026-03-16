@@ -1,34 +1,31 @@
+import { Alignment } from './card.dto';
+
 export enum RoomType {
-  OneVOne = 0,
-  TwoVTwo = 1,
-  OneVTwo = 2,
+  OneVOne,
+  TwoVTwo,
+  OneVTwo,
 }
 
 export enum GameState {
-  Waiting = 0,
-  InProgress = 1,
-  Finished = 2,
-}
-
-export enum Team {
-  Alpha = 0,
-  Beta = 1,
+  Waiting,
+  InProgress,
+  Finished,
 }
 
 export interface GameRoomDto {
   roomCode: string;
   roomType: RoomType;
   state: GameState;
-  currentTurn: number;
   players: GamePlayerDto[];
 }
 
 export interface GamePlayerDto {
   username: string;
   deckName: string;
-  team: Team;
+  alignment: Alignment;
   isHost: boolean;
   isConnected: boolean;
+  force: number;
   hand: CardInstanceDto[];
   deckSize: number;
   arenas: { [arena: string]: CardInstanceDto[] };
@@ -40,6 +37,7 @@ export interface CardInstanceDto {
   cardId: number;
   cardName: string;
   cardImageUrl: string | null;
+  cardType: number;
   isTapped: boolean;
 }
 
@@ -66,7 +64,7 @@ export interface RoomStateResponse {
 export interface PlayerStateResponse {
   userId: string;
   displayName: string;
-  team: Team;
+  alignment: Alignment;
   isConnected: boolean;
   cardsInDeck: number;
   cardsInHand: number;
@@ -77,7 +75,7 @@ export interface PlayerStateResponse {
 export interface MyPlayerStateResponse {
   userId: string;
   displayName: string;
-  team: Team;
+  alignment: Alignment;
   hand: CardInstanceDto[];
   playArea: CardInstanceDto[];
   discardPile: CardInstanceDto[];
@@ -95,7 +93,7 @@ export interface DiceRollResponse {
 export interface PlayerJoinedEvent {
   userId: string;
   displayName: string;
-  team: Team;
+  alignment: Alignment;
 }
 
 export interface PlayerLeftEvent {
@@ -107,11 +105,6 @@ export interface PlayerKickedEvent {
   userId: string;
   displayName: string;
   reason: string;
-}
-
-export interface TeamAssignedEvent {
-  userId: string;
-  team: Team;
 }
 
 export interface GameStartedEvent {

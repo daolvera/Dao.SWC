@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace Dao.SWC.ApiService.Extensions;
 
@@ -6,17 +7,20 @@ public static class ClaimsPrincipalExtensions
 {
     extension(ClaimsPrincipal principal)
     {
-        public string GetAppUserId()
+        public string? GetAppUserId()
         {
-            var claim = principal.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+            // Check for NameIdentifier first (most common in .NET Identity)
+            var claim = principal
+                .Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)
+                ?.Value;
 
-            // Try the application cookie claim
-            claim ??= principal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            // Try "sub" claim (JWT standard - note: .NET JWT handler may remap this)
+            claim ??= principal.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
 
-            if (claim is null)
-            {
-                throw new ArgumentException("User is not authenticated");
-            }
+            // Try the registered JWT claim name constant
+            claim ??= principal
+                .Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)
+                ?.Value;
 
             return claim;
         }

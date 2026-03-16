@@ -9,6 +9,7 @@ public static class Constants
     {
         public const string AppFolder = "../Dao.SWC.Web";
         public const string ApiUrlEnvironmentKey = "API_URL";
+        public const string GameHubPath = "/gamehub";
     }
 
     public static class Authentication
