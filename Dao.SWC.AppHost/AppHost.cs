@@ -6,6 +6,7 @@ var keyVault = builder.AddAzureKeyVault(Constants.ProjectNames.KeyVault);
 
 var postgres = builder
     .AddPostgres(Constants.ProjectNames.DatabaseProvider)
+    .WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent);
 
 var insights = builder.AddAzureApplicationInsights(Constants.ProjectNames.AppInsights);
