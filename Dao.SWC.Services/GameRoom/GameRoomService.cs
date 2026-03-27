@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Enums;
 using Dao.SWC.Core.GameRoom;
 using Dao.SWC.Services.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 namespace Dao.SWC.Services.GameRoom;
 
@@ -316,6 +316,15 @@ public class GameRoomService : IGameRoomService
         room.StartedAt = DateTime.UtcNow;
         room.TurnNumber = 1;
 
+        // Set build counter based on room type (30 for 1v1, 60 otherwise)
+        if (room.RoomType == RoomType.OneVsOne)
+        {
+            foreach (var player in room.Players)
+            {
+                player.BuildCounter = 30;
+            }
+        }
+
         return true;
     }
 
@@ -344,7 +353,7 @@ public class GameRoomService : IGameRoomService
         return Task.FromResult(drawnCards.AsEnumerable());
     }
 
-    public Task<CardInstance?> PlayCardAsync(
+    public Task<PlayCardResult> PlayCardAsync(
         string roomCode,
         string userId,
         Guid cardInstanceId,
@@ -354,13 +363,13 @@ public class GameRoomService : IGameRoomService
     {
         if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
         {
-            return Task.FromResult<CardInstance?>(null);
+            return Task.FromResult(PlayCardResult.Fail("Room not found"));
         }
 
         var player = room.GetPlayer(userId);
         if (player == null)
         {
-            return Task.FromResult<CardInstance?>(null);
+            return Task.FromResult(PlayCardResult.Fail("Player not found"));
         }
 
         var card = player.Cards.FirstOrDefault(c =>
@@ -368,14 +377,68 @@ public class GameRoomService : IGameRoomService
         );
         if (card == null)
         {
-            return Task.FromResult<CardInstance?>(null);
+            return Task.FromResult(PlayCardResult.Fail("Card not found in hand"));
+        }
+
+        var targetArena = arena?.ToLowerInvariant();
+
+        // Validate arena for unit cards
+        if (card.CardType == CardType.Unit && !string.IsNullOrEmpty(targetArena))
+        {
+            var designatedArena = card.DesignatedArena?.ToLowerInvariant();
+            if (!string.IsNullOrEmpty(designatedArena) && designatedArena != targetArena)
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail($"{card.CardName} can only be played in {card.DesignatedArena} arena")
+                );
+            }
+        }
+
+        // For versioned unit cards, check if we need to auto-stack
+        if (
+            card.CardType == CardType.Unit
+            && !string.IsNullOrEmpty(card.Version)
+            && !string.IsNullOrEmpty(targetArena)
+        )
+        {
+            // Check if there's a version conflict in a different arena
+            var conflict = CheckVersionConflict(roomCode, userId, cardInstanceId, targetArena);
+            if (conflict != null)
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail(
+                        $"Cannot play {card.CardName} ({card.Version}) - version {conflict.ConflictingVersion} is already in {conflict.ConflictingArena} arena"
+                    )
+                );
+            }
+
+            // Check if we should auto-stack in the target arena
+            var stackTarget = FindStackTargetInArena(roomCode, userId, cardInstanceId, targetArena);
+            if (stackTarget != null)
+            {
+                // Auto-stack: place card under the existing version
+                card.Zone = CardZone.PlayArea;
+                card.Arena = targetArena;
+                card.StackParentId = stackTarget.InstanceId;
+                stackTarget.StackedUnderIds.Add(card.InstanceId);
+                return Task.FromResult(PlayCardResult.Ok(stackTarget, wasAutoStacked: true));
+            }
+
+            // Check if another version exists (in same arena but not found as target - shouldn't happen, but safety check)
+            if (!CanPlayVersionedCard(roomCode, userId, cardInstanceId))
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail($"Cannot play {card.CardName} ({card.Version}) - same version already in play")
+                );
+            }
         }
 
         card.Zone = CardZone.PlayArea;
         card.ZonePosition = zonePosition ?? player.PlayArea.Count();
-        card.Arena = arena?.ToLowerInvariant();
+        card.Arena = targetArena;
+        card.IsFaceDown = false; // Cards in arenas are always face up
 
-        return Task.FromResult<CardInstance?>(card);
+        return Task.FromResult(PlayCardResult.Ok(card));
     }
 
     public Task<CardInstance?> DiscardCardAsync(string roomCode, string userId, Guid cardInstanceId)
@@ -401,8 +464,45 @@ public class GameRoomService : IGameRoomService
             return Task.FromResult<CardInstance?>(null);
         }
 
+        // Handle stack removal - discard entire stack together
+        if (card.IsStackTop && card.StackedUnderIds.Count > 0)
+        {
+            // Discard ALL stacked cards together
+            foreach (var stackedId in card.StackedUnderIds)
+            {
+                var stackedCard = player.Cards.FirstOrDefault(c => c.InstanceId == stackedId);
+                if (stackedCard != null)
+                {
+                    stackedCard.Zone = CardZone.Discard;
+                    stackedCard.ZonePosition = null;
+                    stackedCard.IsTapped = false;
+                    stackedCard.IsFaceDown = false;
+                    stackedCard.Counter = null;
+                    stackedCard.StackParentId = null;
+                    stackedCard.StackedUnderIds.Clear();
+                    stackedCard.Arena = null;
+                }
+            }
+        }
+        else if (card.IsStackedUnder)
+        {
+            // Remove from parent's stacked list
+            var parent = player.Cards.FirstOrDefault(c => c.InstanceId == card.StackParentId);
+            if (parent != null)
+            {
+                parent.StackedUnderIds.Remove(card.InstanceId);
+            }
+        }
+
+        // Clear stack state for the main card
+        card.StackParentId = null;
+        card.StackedUnderIds.Clear();
+
         card.Zone = CardZone.Discard;
         card.ZonePosition = null;
+        card.IsTapped = false;
+        card.IsFaceDown = false;
+        card.Counter = null;
 
         return Task.FromResult<CardInstance?>(card);
     }
@@ -434,10 +534,44 @@ public class GameRoomService : IGameRoomService
             return Task.FromResult<CardInstance?>(null);
         }
 
+        // If this card is a stack top, unstack all cards under it and return them to hand too
+        if (card.StackedUnderIds.Count > 0)
+        {
+            foreach (var stackedId in card.StackedUnderIds.ToList())
+            {
+                var stackedCard = player.Cards.FirstOrDefault(c => c.InstanceId == stackedId);
+                if (stackedCard != null)
+                {
+                    stackedCard.Zone = CardZone.Hand;
+                    stackedCard.ZonePosition = null;
+                    stackedCard.Arena = null;
+                    stackedCard.IsTapped = false;
+                    stackedCard.IsFaceDown = false;
+                    stackedCard.Counter = null;
+                    stackedCard.StackParentId = null;
+                    stackedCard.StackedUnderIds.Clear();
+                }
+            }
+            card.StackedUnderIds.Clear();
+        }
+
+        // If this card is stacked under another, remove it from parent's stack
+        if (card.StackParentId != null)
+        {
+            var parent = player.Cards.FirstOrDefault(c => c.InstanceId == card.StackParentId);
+            if (parent != null)
+            {
+                parent.StackedUnderIds.Remove(card.InstanceId);
+            }
+            card.StackParentId = null;
+        }
+
         card.Zone = CardZone.Hand;
         card.ZonePosition = null;
         card.Arena = null;
         card.IsTapped = false;
+        card.IsFaceDown = false;
+        card.Counter = null;
 
         return Task.FromResult<CardInstance?>(card);
     }
@@ -639,6 +773,432 @@ public class GameRoomService : IGameRoomService
         return Task.FromResult(true);
     }
 
+    public Task<CardInstance?> ToggleFaceDownAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId && c.Zone == CardZone.PlayArea
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        card.IsFaceDown = !card.IsFaceDown;
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<CardInstance?> SetCounterAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId,
+        int counter
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId
+            && (c.Zone == CardZone.PlayArea || c.Zone == CardZone.BuildZone)
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Clamp counter to reasonable bounds
+        card.Counter = Math.Clamp(counter, 0, 999);
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<CardInstance?> RemoveCounterAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId
+            && (c.Zone == CardZone.PlayArea || c.Zone == CardZone.BuildZone)
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        card.Counter = null;
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<CardInstance?> SetDamageAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId,
+        int damage
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Damage can only be set on cards in the PlayArea (arena)
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId
+            && c.Zone == CardZone.PlayArea
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Clamp damage to reasonable bounds (0-999)
+        card.Damage = Math.Clamp(damage, 0, 999);
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<CardInstance?> RemoveDamageAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Damage can only be removed from cards in the PlayArea (arena)
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId
+            && c.Zone == CardZone.PlayArea
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        card.Damage = null;
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<PlayCardResult> PlayCardFaceDownAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId,
+        int? zonePosition = null,
+        string? arena = null
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(PlayCardResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(PlayCardResult.Fail("Player not found"));
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId && c.Zone == CardZone.Hand
+        );
+        if (card == null)
+        {
+            return Task.FromResult(PlayCardResult.Fail("Card not found in hand"));
+        }
+
+        var targetArena = arena?.ToLowerInvariant();
+
+        // Validate arena for unit cards (even when playing face-down)
+        if (card.CardType == CardType.Unit && !string.IsNullOrEmpty(targetArena))
+        {
+            var designatedArena = card.DesignatedArena?.ToLowerInvariant();
+            if (!string.IsNullOrEmpty(designatedArena) && designatedArena != targetArena)
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail($"{card.CardName} can only be played in {card.DesignatedArena} arena")
+                );
+            }
+        }
+
+        // For versioned unit cards, check for version conflicts
+        if (
+            card.CardType == CardType.Unit
+            && !string.IsNullOrEmpty(card.Version)
+            && !string.IsNullOrEmpty(targetArena)
+        )
+        {
+            // Check if there's a version conflict in a different arena
+            var conflict = CheckVersionConflict(roomCode, userId, cardInstanceId, targetArena);
+            if (conflict != null)
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail(
+                        $"Cannot play {card.CardName} ({card.Version}) - version {conflict.ConflictingVersion} is already in {conflict.ConflictingArena} arena"
+                    )
+                );
+            }
+
+            // Check if we should auto-stack in the target arena
+            var stackTarget = FindStackTargetInArena(roomCode, userId, cardInstanceId, targetArena);
+            if (stackTarget != null)
+            {
+                // Auto-stack: place card under the existing version (but still face-down)
+                card.Zone = CardZone.PlayArea;
+                card.Arena = targetArena;
+                card.IsFaceDown = true;
+                card.StackParentId = stackTarget.InstanceId;
+                stackTarget.StackedUnderIds.Add(card.InstanceId);
+                return Task.FromResult(PlayCardResult.Ok(stackTarget, wasAutoStacked: true));
+            }
+
+            // Check if another version exists
+            if (!CanPlayVersionedCard(roomCode, userId, cardInstanceId))
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail($"Cannot play {card.CardName} ({card.Version}) - same version already in play")
+                );
+            }
+        }
+
+        card.Zone = CardZone.PlayArea;
+        card.ZonePosition = zonePosition ?? player.PlayArea.Count();
+        card.Arena = targetArena;
+        card.IsFaceDown = false; // Cards in arenas are always face up
+
+        return Task.FromResult(PlayCardResult.Ok(card));
+    }
+
+    public Task<CardInstance?> MoveToBuildAsync(string roomCode, string userId, Guid cardInstanceId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Can move from hand or play area to build zone
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId
+            && (c.Zone == CardZone.Hand || c.Zone == CardZone.PlayArea)
+        );
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        card.Zone = CardZone.BuildZone;
+        card.IsFaceDown = true;
+        card.IsTapped = false;
+        card.IsRetreated = false;
+        card.Arena = null;
+
+        return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<bool> ToggleArenaRetreatAsync(string roomCode, string userId, string arena)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(false);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(false);
+        }
+
+        // Toggle the appropriate arena retreat state
+        switch (arena.ToLowerInvariant())
+        {
+            case "space":
+                player.SpaceArenaRetreated = !player.SpaceArenaRetreated;
+                break;
+            case "ground":
+                player.GroundArenaRetreated = !player.GroundArenaRetreated;
+                break;
+            case "character":
+                player.CharacterArenaRetreated = !player.CharacterArenaRetreated;
+                break;
+            default:
+                return Task.FromResult(false);
+        }
+
+        return Task.FromResult(true);
+    }
+
+    public Task<PlayCardResult> MoveFromBuildAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId,
+        string arena
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(PlayCardResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(PlayCardResult.Fail("Player not found"));
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId && c.Zone == CardZone.BuildZone
+        );
+        if (card == null)
+        {
+            return Task.FromResult(PlayCardResult.Fail("Card not found in build zone"));
+        }
+
+        var targetArena = arena.ToLowerInvariant();
+
+        // Validate arena for unit cards
+        if (card.CardType == CardType.Unit && !string.IsNullOrEmpty(targetArena))
+        {
+            var designatedArena = card.DesignatedArena?.ToLowerInvariant();
+            if (!string.IsNullOrEmpty(designatedArena) && designatedArena != targetArena)
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail($"{card.CardName} can only be played in {card.DesignatedArena} arena")
+                );
+            }
+        }
+
+        // For versioned unit cards, check if we need to auto-stack
+        if (
+            card.CardType == CardType.Unit
+            && !string.IsNullOrEmpty(card.Version)
+            && !string.IsNullOrEmpty(targetArena)
+        )
+        {
+            // Check if there's a version conflict in a different arena
+            var conflict = CheckVersionConflict(roomCode, userId, cardInstanceId, targetArena);
+            if (conflict != null)
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail(
+                        $"Cannot play {card.CardName} ({card.Version}) - version {conflict.ConflictingVersion} is already in {conflict.ConflictingArena} arena"
+                    )
+                );
+            }
+
+            // Check if we should auto-stack in the target arena
+            var stackTarget = FindStackTargetInArena(roomCode, userId, cardInstanceId, targetArena);
+            if (stackTarget != null)
+            {
+                // Auto-stack: place card under the existing version
+                card.Zone = CardZone.PlayArea;
+                card.Arena = targetArena;
+                card.StackParentId = stackTarget.InstanceId;
+                card.IsFaceDown = false; // Cards in arenas are always face up
+                stackTarget.StackedUnderIds.Add(card.InstanceId);
+                return Task.FromResult(PlayCardResult.Ok(stackTarget, wasAutoStacked: true));
+            }
+
+            // Check if same version already exists (shouldn't happen if auto-stack found it, but safety check)
+            if (!CanPlayVersionedCard(roomCode, userId, cardInstanceId))
+            {
+                return Task.FromResult(
+                    PlayCardResult.Fail($"Cannot play {card.CardName} ({card.Version}) - same version already in play")
+                );
+            }
+        }
+
+        // Move card from build zone to play area
+        card.Zone = CardZone.PlayArea;
+        card.Arena = targetArena;
+        card.ZonePosition = player.PlayArea.Count();
+        card.IsFaceDown = false; // Cards in arenas are always face up
+        // Counter is preserved
+
+        return Task.FromResult(PlayCardResult.Ok(card));
+    }
+
+    public Task<bool> UpdateBuildCounterAsync(string roomCode, string userId, int buildCounter)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(false);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(false);
+        }
+
+        player.BuildCounter = buildCounter;
+
+        return Task.FromResult(true);
+    }
+
     #region Private Helpers
 
     private static string GenerateRoomCode()
@@ -698,6 +1258,8 @@ public class GameRoomService : IGameRoomService
                         CardName = deckCard.Card.Name,
                         ImageUrl = imageUrl,
                         CardType = deckCard.Card.Type,
+                        DesignatedArena = deckCard.Card.Arena?.ToString().ToLowerInvariant(),
+                        Version = deckCard.Card.Version,
                         Zone = CardZone.Deck,
                     }
                 );
@@ -721,6 +1283,362 @@ public class GameRoomService : IGameRoomService
         player.Cards.Clear();
         player.Cards.AddRange(deckCards);
         player.Cards.AddRange(nonDeckCards);
+    }
+
+    #endregion
+
+    #region Card Stacking (Versioned Units)
+
+    public Task<StackResult> StackCardAsync(
+        string roomCode,
+        string userId,
+        Guid cardToStackId,
+        Guid targetCardId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(StackResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(StackResult.Fail("Player not found"));
+        }
+
+        // Find both cards
+        var cardToStack = player.Cards.FirstOrDefault(c => c.InstanceId == cardToStackId);
+        var targetCard = player.Cards.FirstOrDefault(c => c.InstanceId == targetCardId);
+
+        if (cardToStack == null)
+        {
+            return Task.FromResult(StackResult.Fail("Card to stack not found"));
+        }
+
+        if (targetCard == null)
+        {
+            return Task.FromResult(StackResult.Fail("Target card not found"));
+        }
+
+        // Validate: both must be units
+        if (cardToStack.CardType != CardType.Unit || targetCard.CardType != CardType.Unit)
+        {
+            return Task.FromResult(StackResult.Fail("Only unit cards can be stacked"));
+        }
+
+        // Validate: both must have versions
+        if (string.IsNullOrEmpty(cardToStack.Version))
+        {
+            return Task.FromResult(StackResult.Fail("Card to stack must have a version"));
+        }
+
+        if (string.IsNullOrEmpty(targetCard.Version))
+        {
+            return Task.FromResult(StackResult.Fail("Target card must have a version"));
+        }
+
+        // Validate: same card name (base name without version)
+        if (
+            !string.Equals(
+                cardToStack.CardName,
+                targetCard.CardName,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return Task.FromResult(
+                StackResult.Fail("Cards must have the same name to stack")
+            );
+        }
+
+        // Validate: different versions (can't stack same version on itself)
+        if (
+            string.Equals(
+                cardToStack.Version,
+                targetCard.Version,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return Task.FromResult(
+                StackResult.Fail("Cannot stack the same version on itself")
+            );
+        }
+
+        // Validate: target must be in play area (arena)
+        if (targetCard.Zone != CardZone.PlayArea)
+        {
+            return Task.FromResult(StackResult.Fail("Target card must be in the arena"));
+        }
+
+        // Validate: card to stack must be in hand
+        if (cardToStack.Zone != CardZone.Hand)
+        {
+            return Task.FromResult(StackResult.Fail("Card to stack must be in hand"));
+        }
+
+        // If target is already stacked under something, we need the actual top
+        if (targetCard.IsStackedUnder)
+        {
+            return Task.FromResult(
+                StackResult.Fail("Can only stack under the top card of a stack")
+            );
+        }
+
+        // Move cardToStack to play area and mark it as stacked
+        cardToStack.Zone = CardZone.PlayArea;
+        cardToStack.Arena = targetCard.Arena;
+        cardToStack.StackParentId = targetCard.InstanceId;
+
+        // Add to target's stacked list
+        targetCard.StackedUnderIds.Add(cardToStack.InstanceId);
+
+        return Task.FromResult(StackResult.Ok(targetCard));
+    }
+
+    public Task<StackResult> SetStackTopAsync(
+        string roomCode,
+        string userId,
+        Guid stackTopCardId,
+        Guid newTopCardId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(StackResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(StackResult.Fail("Player not found"));
+        }
+
+        // Find current top card
+        var currentTop = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == stackTopCardId && c.IsStackTop
+        );
+
+        if (currentTop == null)
+        {
+            return Task.FromResult(StackResult.Fail("Current top card not found or has no stack"));
+        }
+
+        // Find the new top card (must be in the stack)
+        if (!currentTop.StackedUnderIds.Contains(newTopCardId))
+        {
+            return Task.FromResult(StackResult.Fail("New top card is not in this stack"));
+        }
+
+        var newTop = player.Cards.FirstOrDefault(c => c.InstanceId == newTopCardId);
+        if (newTop == null)
+        {
+            return Task.FromResult(StackResult.Fail("New top card not found"));
+        }
+
+        // Swap: new top takes over the stack
+        newTop.StackParentId = null;
+        newTop.StackedUnderIds = currentTop
+            .StackedUnderIds.Where(id => id != newTopCardId)
+            .ToList();
+        newTop.StackedUnderIds.Add(currentTop.InstanceId);
+
+        // Current top becomes stacked under new top
+        currentTop.StackParentId = newTop.InstanceId;
+        currentTop.StackedUnderIds.Clear();
+
+        // Update all other stacked cards to point to new top
+        foreach (var stackedId in newTop.StackedUnderIds.Where(id => id != currentTop.InstanceId))
+        {
+            var stackedCard = player.Cards.FirstOrDefault(c => c.InstanceId == stackedId);
+            if (stackedCard != null)
+            {
+                stackedCard.StackParentId = newTop.InstanceId;
+            }
+        }
+
+        return Task.FromResult(StackResult.Ok(newTop));
+    }
+
+    public bool CanPlayVersionedCard(string roomCode, string userId, Guid cardInstanceId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return false;
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return false;
+        }
+
+        var card = player.Cards.FirstOrDefault(c => c.InstanceId == cardInstanceId);
+        if (card == null)
+        {
+            return true; // Card not found, let other validation handle it
+        }
+
+        // Non-versioned cards can always be played
+        if (string.IsNullOrEmpty(card.Version))
+        {
+            return true;
+        }
+
+        // Non-unit cards can always be played
+        if (card.CardType != CardType.Unit)
+        {
+            return true;
+        }
+
+        // Check if the SAME version of this card is already in the play area
+        // (can't have two of the same version, e.g., two Darth Vader B)
+        var sameVersionInPlay = player.Cards.Any(c =>
+            c.Zone == CardZone.PlayArea
+            && c.CardType == CardType.Unit
+            && c.InstanceId != card.InstanceId // Not the same card instance
+            && string.Equals(c.CardName, card.CardName, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrEmpty(c.Version)
+            && string.Equals(c.Version, card.Version, StringComparison.OrdinalIgnoreCase)
+        );
+
+        // If the same version is already in play, cannot play this card at all
+        if (sameVersionInPlay)
+        {
+            return false;
+        }
+
+        // Check if any other version of this card is in the play area (not stacked under)
+        var otherVersionInPlay = player.Cards.Any(c =>
+            c.Zone == CardZone.PlayArea
+            && c.CardType == CardType.Unit
+            && !c.IsStackedUnder // Only count top-level cards
+            && string.Equals(c.CardName, card.CardName, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrEmpty(c.Version)
+            && !string.Equals(c.Version, card.Version, StringComparison.OrdinalIgnoreCase)
+        );
+
+        // If another version is in play, this card MUST be stacked (can't play independently)
+        return !otherVersionInPlay;
+    }
+
+    public IEnumerable<CardInstance> GetStackableCards(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return [];
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return [];
+        }
+
+        var card = player.Cards.FirstOrDefault(c => c.InstanceId == cardInstanceId);
+        if (card == null || card.CardType != CardType.Unit || string.IsNullOrEmpty(card.Version))
+        {
+            return [];
+        }
+
+        // Find other versions of this card in the play area that are stack tops (or not stacked)
+        return player.Cards.Where(c =>
+            c.Zone == CardZone.PlayArea
+            && c.CardType == CardType.Unit
+            && !c.IsStackedUnder // Only top-level cards can accept stacks
+            && string.Equals(c.CardName, card.CardName, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrEmpty(c.Version)
+            && !string.Equals(c.Version, card.Version, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    public CardInstance? FindStackTargetInArena(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId,
+        string targetArena
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return null;
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return null;
+        }
+
+        var card = player.Cards.FirstOrDefault(c => c.InstanceId == cardInstanceId);
+        if (card == null || card.CardType != CardType.Unit || string.IsNullOrEmpty(card.Version))
+        {
+            return null;
+        }
+
+        // Find another version of this card in the specified arena that is not stacked under
+        return player.Cards.FirstOrDefault(c =>
+            c.Zone == CardZone.PlayArea
+            && c.CardType == CardType.Unit
+            && !c.IsStackedUnder
+            && string.Equals(c.Arena, targetArena, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(c.CardName, card.CardName, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrEmpty(c.Version)
+            && !string.Equals(c.Version, card.Version, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    public VersionConflictInfo? CheckVersionConflict(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId,
+        string targetArena
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return null;
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return null;
+        }
+
+        var card = player.Cards.FirstOrDefault(c => c.InstanceId == cardInstanceId);
+        if (card == null || card.CardType != CardType.Unit || string.IsNullOrEmpty(card.Version))
+        {
+            return null;
+        }
+
+        // Find another version of this card in a DIFFERENT arena
+        var conflictingCard = player.Cards.FirstOrDefault(c =>
+            c.Zone == CardZone.PlayArea
+            && c.CardType == CardType.Unit
+            && !c.IsStackedUnder
+            && !string.Equals(c.Arena, targetArena, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(c.CardName, card.CardName, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrEmpty(c.Version)
+            && !string.Equals(c.Version, card.Version, StringComparison.OrdinalIgnoreCase)
+        );
+
+        if (conflictingCard == null)
+        {
+            return null;
+        }
+
+        return new VersionConflictInfo
+        {
+            ConflictingCardName = conflictingCard.CardName,
+            ConflictingVersion = conflictingCard.Version!,
+            ConflictingArena = conflictingCard.Arena ?? "unknown"
+        };
     }
 
     #endregion

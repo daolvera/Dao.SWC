@@ -41,6 +41,7 @@ export class AuthService {
     this.http.delete(environment.apiUrl + '/Auth/logout').subscribe(() => {
       this.userInfo.set(null);
       this.router.navigate(['/']);
+      window.location.reload();
     });
   }
 

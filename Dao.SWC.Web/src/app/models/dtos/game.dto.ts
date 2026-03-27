@@ -26,10 +26,16 @@ export interface GamePlayerDto {
   isHost: boolean;
   isConnected: boolean;
   force: number;
+  buildCounter: number;
   hand: CardInstanceDto[];
+  handSize: number;
   deckSize: number;
   arenas: { [arena: string]: CardInstanceDto[] };
   discardPile: CardInstanceDto[];
+  buildZone: CardInstanceDto[];
+  spaceArenaRetreated: boolean;
+  groundArenaRetreated: boolean;
+  characterArenaRetreated: boolean;
 }
 
 export interface CardInstanceDto {
@@ -38,7 +44,15 @@ export interface CardInstanceDto {
   cardName: string;
   cardImageUrl: string | null;
   cardType: number;
+  cardArena: string | null;
+  version: string | null;
   isTapped: boolean;
+  isFaceDown: boolean;
+  isRetreated: boolean;
+  counter: number | null;
+  damage: number | null;
+  stackParentId: string | null;
+  stackedUnderIds: string[];
 }
 
 export interface DiceRolledEvent {
@@ -129,4 +143,19 @@ export interface CardPlayedEvent {
 export interface CardDiscardedEvent {
   userId: string;
   card: CardInstanceDto;
+}
+
+// Stack operation result
+export interface StackResultDto {
+  success: boolean;
+  errorMessage: string | null;
+  topCard: CardInstanceDto | null;
+}
+
+// Play card result (for auto-stacking)
+export interface PlayCardResultDto {
+  success: boolean;
+  errorMessage: string | null;
+  card: CardInstanceDto | null;
+  wasAutoStacked: boolean;
 }

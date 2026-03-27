@@ -21,6 +21,26 @@ public class GamePlayer
     public int Force { get; set; } = 4;
 
     /// <summary>
+    /// The player's Build counter. Starts at 60 (or 30 for 1v1).
+    /// </summary>
+    public int BuildCounter { get; set; } = 60;
+
+    /// <summary>
+    /// Whether the Space arena is retreated.
+    /// </summary>
+    public bool SpaceArenaRetreated { get; set; }
+
+    /// <summary>
+    /// Whether the Ground arena is retreated.
+    /// </summary>
+    public bool GroundArenaRetreated { get; set; }
+
+    /// <summary>
+    /// Whether the Character arena is retreated.
+    /// </summary>
+    public bool CharacterArenaRetreated { get; set; }
+
+    /// <summary>
     /// The alignment of the player's deck (Light, Dark, or Neutral).
     /// </summary>
     public Alignment DeckAlignment { get; set; }
@@ -49,6 +69,7 @@ public class GamePlayer
     public IEnumerable<CardInstance> Hand => Cards.Where(c => c.Zone == CardZone.Hand);
     public IEnumerable<CardInstance> PlayArea => Cards.Where(c => c.Zone == CardZone.PlayArea);
     public IEnumerable<CardInstance> DiscardPile => Cards.Where(c => c.Zone == CardZone.Discard);
+    public IEnumerable<CardInstance> BuildArea => Cards.Where(c => c.Zone == CardZone.BuildZone);
 
     // Arena-specific card collections
     public IEnumerable<CardInstance> SpaceArena =>

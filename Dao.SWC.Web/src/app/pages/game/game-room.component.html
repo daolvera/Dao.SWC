@@ -1,0 +1,1487 @@
+<div #gameContainer class="game-container" [class.fullscreen]="isFullscreen()">
+  <!-- Notifications inside game container for fullscreen mode -->
+  <app-notifications></app-notifications>
+  
+  @if (room()) {
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="d-flex align-items-center gap-3">
+        <span class="room-code font-monospace">{{ roomCode }}</span>
+        <span class="badge" [class]="roomTypeBadgeClass()">
+          {{ roomTypeLabel() }}
+        </span>
+        <span class="badge" [class]="stateBadgeClass()">
+          {{ stateLabel() }}
+        </span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        @if (room()!.state === GameState.Waiting && isHost()) {
+          <button class="btn btn-success btn-sm" [disabled]="!canStart()" (click)="startGame()">
+            Start Game
+          </button>
+        }
+        <button
+          class="btn btn-outline-light btn-sm"
+          (click)="toggleFullscreen()"
+          [title]="isFullscreen() ? 'Exit Fullscreen' : 'Enter Fullscreen'"
+        >
+          {{ isFullscreen() ? '⊟' : '⛶' }}
+        </button>
+        <a routerLink="/play" class="btn btn-outline-light btn-sm">Exit</a>
+      </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="game-area">
+      <!-- Waiting State: Show player list and share code -->
+      @if (room()!.state === GameState.Waiting) {
+        <div class="waiting-overlay">
+          <div class="waiting-content">
+            <h2>Waiting for Players</h2>
+            <div class="room-code-display">{{ roomCode }}</div>
+            <button class="btn btn-outline-primary mb-4" (click)="copyRoomCode()">Copy Code</button>
+            <div class="players-grid">
+              @for (player of room()!.players; track player.username) {
+                <div class="player-card" [class.host]="player.isHost">
+                  <div class="player-name">
+                    {{ player.username }}
+                    @if (player.isHost) {
+                      <span class="badge bg-warning text-dark ms-1">Host</span>
+                    }
+                  </div>
+                  <div class="deck-name">{{ player.deckName }}</div>
+                  <div class="alignment-badge">
+                    <span
+                      class="badge"
+                      [class]="player.alignment === Alignment.Light ? 'bg-primary' : 'bg-danger'"
+                    >
+                      {{ player.alignment === Alignment.Light ? 'Light Side' : 'Dark Side' }}
+                    </span>
+                  </div>
+                  @if (isHost() && !player.isHost) {
+                    <button
+                      class="btn btn-outline-danger btn-sm mt-2"
+                      (click)="kickPlayer(player.username)"
+                    >
+                      Kick
+                    </button>
+                  }
+                </div>
+              }
+              @for (i of emptySlots(); track i) {
+                <div class="player-card empty">
+                  <span class="text-muted">Waiting...</span>
+                </div>
+              }
+            </div>
+            @if (canStart()) {
+              <p class="mt-3 text-success">Ready to start!</p>
+            } @else {
+              <p class="mt-3 text-muted">Need at least 2 players to start</p>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- In-Progress State: Chess-board style layout -->
+      @if (room()!.state === GameState.InProgress) {
+        <div class="board-container chess-board">
+          <!-- Opponent Info Strip (minimal) -->
+          @for (opponent of opponents(); track opponent.username) {
+            <div class="opponent-info-strip">
+              <span class="player-name">{{ opponent.username }}</span>
+              <span class="force-display">
+                <span class="force-label">Force:</span>
+                <span class="force-value">{{ opponent.force }}</span>
+              </span>
+              <span class="card-counts">
+                <span title="Hand">Hand: {{ opponent.handSize }}</span>
+                <span title="Deck">Deck: {{ opponent.deckSize }}</span>
+                <button
+                  class="build-btn"
+                  (click)="showOpponentBuildZone.set(opponent)"
+                  title="View build zone"
+                >
+                  Build ({{ opponent.buildZone.length }})
+                </button>
+              </span>
+            </div>
+          }
+
+          <!-- Chess-board Arena Grid -->
+          <div class="arena-grid">
+            <!-- Row 1: Opponent Arenas (rotated 180°) -->
+            @for (opponent of opponents(); track opponent.username) {
+              <!-- Opponent Character Arena -->
+              <div
+                class="arena character-arena opponent-arena"
+                [class.arena-retreated]="isArenaRetreated(opponent, 'character')"
+              >
+                    <div class="arena-label">
+                      CHARACTER
+                      @if (isArenaRetreated(opponent, 'character')) {
+                        <span class="arena-retreated-badge">RETREATED</span>
+                      }
+                    </div>
+                    <div class="arena-content">
+                      @if (getPlayerArenaOthers(opponent, 'character').length > 0) {
+                        <div class="others-section">
+                          @for (
+                            card of getPlayerArenaOthers(opponent, 'character');
+                            track card.instanceId
+                          ) {
+                            <div
+                              class="game-card tiny sideways"
+                              [class.tapped]="card.isTapped"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge tiny">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge tiny">{{ card.damage }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                      <div class="units-section">
+                        @for (
+                          card of getPlayerArenaUnits(opponent, 'character');
+                          track card.instanceId
+                        ) {
+                          @if (hasStack(card)) {
+                            <div class="card-stack small">
+                              <div
+                                class="game-card small stack-top"
+                                [class.tapped]="card.isTapped"
+                                (dblclick)="zoomCard.set(card)"
+                                (contextmenu)="openOpponentCardMenu($event, card)"
+                              >
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="card.cardName"
+                                />
+                                @if (card.isTapped) {
+                                  <div class="tapped-indicator small">TAP</div>
+                                }
+                                @if (card.counter !== null && card.counter !== undefined) {
+                                  <div class="counter-badge small">{{ card.counter }}</div>
+                                }
+                                @if (card.damage !== null && card.damage !== undefined) {
+                                  <div class="damage-badge small">{{ card.damage }}</div>
+                                }
+                                @if (card.version) {
+                                  <div class="version-badge small">{{ card.version }}</div>
+                                }
+                              </div>
+                              @for (
+                                stackedCard of getStackedCards(opponent, card);
+                                track stackedCard.instanceId
+                              ) {
+                                <div
+                                  class="game-card small stacked-card"
+                                  (dblclick)="zoomCard.set(stackedCard)"
+                                  (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                >
+                                  <img
+                                    [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                    [alt]="stackedCard.cardName"
+                                  />
+                                  @if (stackedCard.version) {
+                                    <div class="version-badge small">{{ stackedCard.version }}</div>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          } @else {
+                            <div
+                              class="game-card small"
+                              [class.tapped]="card.isTapped"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.isTapped) {
+                                <div class="tapped-indicator small">TAP</div>
+                              }
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge small">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge small">{{ card.damage }}</div>
+                              }
+                              @if (card.version) {
+                                <div class="version-badge small">{{ card.version }}</div>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Ground Arena -->
+                  <div
+                    class="arena ground-arena opponent-arena"
+                    [class.arena-retreated]="isArenaRetreated(opponent, 'ground')"
+                  >
+                    <div class="arena-label">
+                      GROUND
+                      @if (isArenaRetreated(opponent, 'ground')) {
+                        <span class="arena-retreated-badge">RETREATED</span>
+                      }
+                    </div>
+                    <div class="arena-content">
+                      @if (getPlayerArenaOthers(opponent, 'ground').length > 0) {
+                        <div class="others-section">
+                          @for (
+                            card of getPlayerArenaOthers(opponent, 'ground');
+                            track card.instanceId
+                          ) {
+                            <div
+                              class="game-card tiny sideways"
+                              [class.tapped]="card.isTapped"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge tiny">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge tiny">{{ card.damage }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                      <div class="units-section">
+                        @for (
+                          card of getPlayerArenaUnits(opponent, 'ground');
+                          track card.instanceId
+                        ) {
+                          @if (hasStack(card)) {
+                            <div class="card-stack small">
+                              <div
+                                class="game-card small stack-top"
+                                [class.tapped]="card.isTapped"
+                                (dblclick)="zoomCard.set(card)"
+                                (contextmenu)="openOpponentCardMenu($event, card)"
+                              >
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="card.cardName"
+                                />
+                                @if (card.isTapped) {
+                                  <div class="tapped-indicator small">TAP</div>
+                                }
+                                @if (card.counter !== null && card.counter !== undefined) {
+                                  <div class="counter-badge small">{{ card.counter }}</div>
+                                }
+                                @if (card.damage !== null && card.damage !== undefined) {
+                                  <div class="damage-badge small">{{ card.damage }}</div>
+                                }
+                                @if (card.version) {
+                                  <div class="version-badge small">{{ card.version }}</div>
+                                }
+                              </div>
+                              @for (
+                                stackedCard of getStackedCards(opponent, card);
+                                track stackedCard.instanceId
+                              ) {
+                                <div
+                                  class="game-card small stacked-card"
+                                  (dblclick)="zoomCard.set(stackedCard)"
+                                  (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                >
+                                  <img
+                                    [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                    [alt]="stackedCard.cardName"
+                                  />
+                                  @if (stackedCard.version) {
+                                    <div class="version-badge small">{{ stackedCard.version }}</div>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          } @else {
+                            <div
+                              class="game-card small"
+                              [class.tapped]="card.isTapped"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.isTapped) {
+                                <div class="tapped-indicator small">TAP</div>
+                              }
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge small">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge small">{{ card.damage }}</div>
+                              }
+                              @if (card.version) {
+                                <div class="version-badge small">{{ card.version }}</div>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Space Arena -->
+                  <div
+                    class="arena space-arena opponent-arena"
+                    [class.arena-retreated]="isArenaRetreated(opponent, 'space')"
+                  >
+                    <div class="arena-label">
+                      SPACE
+                      @if (isArenaRetreated(opponent, 'space')) {
+                        <span class="arena-retreated-badge">RETREATED</span>
+                      }
+                    </div>
+                    <div class="arena-content">
+                      @if (getPlayerArenaOthers(opponent, 'space').length > 0) {
+                        <div class="others-section">
+                          @for (
+                            card of getPlayerArenaOthers(opponent, 'space');
+                            track card.instanceId
+                          ) {
+                            <div
+                              class="game-card tiny sideways"
+                              [class.tapped]="card.isTapped"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge tiny">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge tiny">{{ card.damage }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                      <div class="units-section">
+                        @for (
+                          card of getPlayerArenaUnits(opponent, 'space');
+                          track card.instanceId
+                        ) {
+                          @if (hasStack(card)) {
+                            <div class="card-stack small">
+                              <div
+                                class="game-card small stack-top"
+                                [class.tapped]="card.isTapped"
+                                (dblclick)="zoomCard.set(card)"
+                                (contextmenu)="openOpponentCardMenu($event, card)"
+                              >
+                                <img
+                                  [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="card.cardName"
+                                />
+                                @if (card.isTapped) {
+                                  <div class="tapped-indicator small">TAP</div>
+                                }
+                                @if (card.counter !== null && card.counter !== undefined) {
+                                  <div class="counter-badge small">{{ card.counter }}</div>
+                                }
+                                @if (card.damage !== null && card.damage !== undefined) {
+                                  <div class="damage-badge small">{{ card.damage }}</div>
+                                }
+                                @if (card.version) {
+                                  <div class="version-badge small">{{ card.version }}</div>
+                                }
+                              </div>
+                              @for (
+                                stackedCard of getStackedCards(opponent, card);
+                                track stackedCard.instanceId
+                              ) {
+                                <div
+                                  class="game-card small stacked-card"
+                                  (dblclick)="zoomCard.set(stackedCard)"
+                                  (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                >
+                                  <img
+                                    [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                    [alt]="stackedCard.cardName"
+                                  />
+                                  @if (stackedCard.version) {
+                                    <div class="version-badge small">{{ stackedCard.version }}</div>
+                                  }
+                                </div>
+                              }
+                            </div>
+                          } @else {
+                            <div
+                              class="game-card small"
+                              [class.tapped]="card.isTapped"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.isTapped) {
+                                <div class="tapped-indicator small">TAP</div>
+                              }
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge small">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge small">{{ card.damage }}</div>
+                              }
+                              @if (card.version) {
+                                <div class="version-badge small">{{ card.version }}</div>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+            }
+          </div>
+
+          <!-- Player Arenas Row -->
+          <div class="player-arenas-row">
+            <!-- Character Arena -->
+            <div
+              class="arena character-arena player-arena"
+              (dragover)="onDragOver($event)"
+              (drop)="onDrop($event, 'character')"
+              [class.drag-over]="dragOverZone() === 'character'"
+              [class.arena-retreated]="myPlayer()?.characterArenaRetreated"
+            >
+              <div class="arena-label">
+                    CHARACTER
+                    <button
+                      class="btn btn-xs btn-outline-warning arena-retreat-btn"
+                      (click)="toggleArenaRetreat('character'); $event.stopPropagation()"
+                    >
+                      {{ myPlayer()?.characterArenaRetreated ? 'Un-retreat' : 'Retreat' }}
+                    </button>
+                  </div>
+                  <div class="arena-content">
+                    @if (myArenaOthers('character').length > 0) {
+                      <div class="others-section">
+                        @for (card of myArenaOthers('character'); track card.instanceId) {
+                          <div
+                            class="game-card tiny sideways"
+                            [class.tapped]="card.isTapped"
+                            [class.face-down]="card.isFaceDown"
+                            [class.retreated]="card.isRetreated"
+                            [class.selected]="selectedCard() === card.instanceId"
+                            draggable="true"
+                            (dragstart)="onDragStart($event, card, 'character')"
+                            (dragend)="onDragEnd()"
+                            (click)="selectCard(card.instanceId)"
+                            (dblclick)="zoomCard.set(card)"
+                            (contextmenu)="openCardMenu($event, card)"
+                          >
+                            <img
+                              [src]="
+                                card.isFaceDown
+                                  ? 'assets/card-back.jpg'
+                                  : card.cardImageUrl || 'assets/card-back.jpg'
+                              "
+                              [alt]="card.isFaceDown ? 'Face Down' : card.cardName"
+                            />
+                            @if (card.isTapped) {
+                              <div class="tapped-indicator tiny">TAP</div>
+                            }
+                            @if (card.counter !== null && card.counter !== undefined) {
+                              <div class="counter-badge tiny">{{ card.counter }}</div>
+                            }
+                            @if (card.damage !== null && card.damage !== undefined) {
+                              <div class="damage-badge tiny">{{ card.damage }}</div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    <div class="units-section">
+                      @for (card of myArenaUnits('character'); track card.instanceId) {
+                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)">
+                          <!-- Top card of the stack (rightmost due to row-reverse) -->
+                          <div
+                            class="game-card small stack-top"
+                            [class.tapped]="card.isTapped"
+                            [class.face-down]="card.isFaceDown"
+                            [class.retreated]="card.isRetreated"
+                            [class.selected]="selectedCard() === card.instanceId"
+                            draggable="true"
+                            (dragstart)="onDragStart($event, card, 'character')"
+                            (dragend)="onDragEnd()"
+                            (click)="selectCard(card.instanceId)"
+                            (dblclick)="zoomCard.set(card)"
+                            (contextmenu)="
+                              hasStack(card)
+                                ? openStackMenu($event, card)
+                                : openCardMenu($event, card)
+                            "
+                          >
+                            <img
+                              [src]="
+                                card.isFaceDown
+                                  ? 'assets/card-back.jpg'
+                                  : card.cardImageUrl || 'assets/card-back.jpg'
+                              "
+                              [alt]="card.isFaceDown ? 'Face Down' : card.cardName"
+                            />
+                            @if (!card.isFaceDown) {
+                              <div class="card-name">{{ card.cardName }}</div>
+                            }
+                            @if (card.isTapped) {
+                              <div class="tapped-indicator small">TAP</div>
+                            }
+                            @if (card.isRetreated) {
+                              <div class="retreated-indicator small">RETREAT</div>
+                            }
+                            @if (card.counter !== null && card.counter !== undefined) {
+                              <div class="counter-badge small">{{ card.counter }}</div>
+                            }
+                            @if (card.damage !== null && card.damage !== undefined) {
+                              <div class="damage-badge small">{{ card.damage }}</div>
+                            }
+                            @if (hasStack(card)) {
+                              <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                            }
+                            @if (card.version && !card.isFaceDown) {
+                              <div class="version-badge small">{{ card.version }}</div>
+                            }
+                          </div>
+                          <!-- Stacked cards (shown to the left of top card, showing right edge) -->
+                          @for (
+                            stackedCard of getMyStackedCards(card);
+                            track stackedCard.instanceId
+                          ) {
+                            <div
+                              class="game-card small stacked-card"
+                              [class.tapped]="stackedCard.isTapped"
+                              [class.face-down]="stackedCard.isFaceDown"
+                              (dblclick)="zoomCard.set(stackedCard)"
+                            >
+                              <img
+                                [src]="
+                                  stackedCard.isFaceDown
+                                    ? 'assets/card-back.jpg'
+                                    : stackedCard.cardImageUrl || 'assets/card-back.jpg'
+                                "
+                                [alt]="stackedCard.isFaceDown ? 'Face Down' : stackedCard.cardName"
+                              />
+                              @if (stackedCard.version) {
+                                <div class="version-badge small">{{ stackedCard.version }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+                <!-- Ground Arena -->
+                <div
+                  class="arena ground-arena player-arena"
+                  (dragover)="onDragOver($event)"
+                  (drop)="onDrop($event, 'ground')"
+                  [class.drag-over]="dragOverZone() === 'ground'"
+                  [class.arena-retreated]="myPlayer()?.groundArenaRetreated"
+                >
+                  <div class="arena-label">
+                    GROUND
+                    <button
+                      class="btn btn-xs btn-outline-warning arena-retreat-btn"
+                      (click)="toggleArenaRetreat('ground'); $event.stopPropagation()"
+                    >
+                      {{ myPlayer()?.groundArenaRetreated ? 'Un-retreat' : 'Retreat' }}
+                    </button>
+                  </div>
+                  <div class="arena-content">
+                    @if (myArenaOthers('ground').length > 0) {
+                      <div class="others-section">
+                        @for (card of myArenaOthers('ground'); track card.instanceId) {
+                          <div
+                            class="game-card tiny sideways"
+                            [class.tapped]="card.isTapped"
+                            [class.face-down]="card.isFaceDown"
+                            [class.retreated]="card.isRetreated"
+                            [class.selected]="selectedCard() === card.instanceId"
+                            draggable="true"
+                            (dragstart)="onDragStart($event, card, 'ground')"
+                            (dragend)="onDragEnd()"
+                            (click)="selectCard(card.instanceId)"
+                            (dblclick)="zoomCard.set(card)"
+                            (contextmenu)="openCardMenu($event, card)"
+                          >
+                            <img
+                              [src]="
+                                card.isFaceDown
+                                  ? 'assets/card-back.jpg'
+                                  : card.cardImageUrl || 'assets/card-back.jpg'
+                              "
+                              [alt]="card.isFaceDown ? 'Face Down' : card.cardName"
+                            />
+                            @if (card.isTapped) {
+                              <div class="tapped-indicator tiny">TAP</div>
+                            }
+                            @if (card.counter !== null && card.counter !== undefined) {
+                              <div class="counter-badge tiny">{{ card.counter }}</div>
+                            }
+                            @if (card.damage !== null && card.damage !== undefined) {
+                              <div class="damage-badge tiny">{{ card.damage }}</div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    <div class="units-section">
+                      @for (card of myArenaUnits('ground'); track card.instanceId) {
+                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)">
+                          <!-- Top card of the stack (rightmost due to row-reverse) -->
+                          <div
+                            class="game-card small stack-top"
+                            [class.tapped]="card.isTapped"
+                            [class.face-down]="card.isFaceDown"
+                            [class.retreated]="card.isRetreated"
+                            [class.selected]="selectedCard() === card.instanceId"
+                            draggable="true"
+                            (dragstart)="onDragStart($event, card, 'ground')"
+                            (dragend)="onDragEnd()"
+                            (click)="selectCard(card.instanceId)"
+                            (dblclick)="zoomCard.set(card)"
+                            (contextmenu)="
+                              hasStack(card)
+                                ? openStackMenu($event, card)
+                                : openCardMenu($event, card)
+                            "
+                          >
+                            <img
+                              [src]="
+                                card.isFaceDown
+                                  ? 'assets/card-back.jpg'
+                                  : card.cardImageUrl || 'assets/card-back.jpg'
+                              "
+                              [alt]="card.isFaceDown ? 'Face Down' : card.cardName"
+                            />
+                            @if (!card.isFaceDown) {
+                              <div class="card-name">{{ card.cardName }}</div>
+                            }
+                            @if (card.isTapped) {
+                              <div class="tapped-indicator small">TAP</div>
+                            }
+                            @if (card.isRetreated) {
+                              <div class="retreated-indicator small">RETREAT</div>
+                            }
+                            @if (card.counter !== null && card.counter !== undefined) {
+                              <div class="counter-badge small">{{ card.counter }}</div>
+                            }
+                            @if (card.damage !== null && card.damage !== undefined) {
+                              <div class="damage-badge small">{{ card.damage }}</div>
+                            }
+                            @if (hasStack(card)) {
+                              <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                            }
+                            @if (card.version && !card.isFaceDown) {
+                              <div class="version-badge small">{{ card.version }}</div>
+                            }
+                          </div>
+                          <!-- Stacked cards (shown to the left of top card, showing right edge) -->
+                          @for (
+                            stackedCard of getMyStackedCards(card);
+                            track stackedCard.instanceId
+                          ) {
+                            <div
+                              class="game-card small stacked-card"
+                              [class.tapped]="stackedCard.isTapped"
+                              [class.face-down]="stackedCard.isFaceDown"
+                              (dblclick)="zoomCard.set(stackedCard)"
+                            >
+                              <img
+                                [src]="
+                                  stackedCard.isFaceDown
+                                    ? 'assets/card-back.jpg'
+                                    : stackedCard.cardImageUrl || 'assets/card-back.jpg'
+                                "
+                                [alt]="stackedCard.isFaceDown ? 'Face Down' : stackedCard.cardName"
+                              />
+                              @if (stackedCard.version) {
+                                <div class="version-badge small">{{ stackedCard.version }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+                <!-- Space Arena -->
+                <div
+                  class="arena space-arena player-arena"
+                  (dragover)="onDragOver($event)"
+                  (drop)="onDrop($event, 'space')"
+                  [class.drag-over]="dragOverZone() === 'space'"
+                  [class.arena-retreated]="myPlayer()?.spaceArenaRetreated"
+                >
+                  <div class="arena-label">
+                    SPACE
+                    <button
+                      class="btn btn-xs btn-outline-warning arena-retreat-btn"
+                      (click)="toggleArenaRetreat('space'); $event.stopPropagation()"
+                    >
+                      {{ myPlayer()?.spaceArenaRetreated ? 'Un-retreat' : 'Retreat' }}
+                    </button>
+                  </div>
+                  <div class="arena-content">
+                    @if (myArenaOthers('space').length > 0) {
+                      <div class="others-section">
+                        @for (card of myArenaOthers('space'); track card.instanceId) {
+                          <div
+                            class="game-card tiny sideways"
+                            [class.tapped]="card.isTapped"
+                            [class.face-down]="card.isFaceDown"
+                            [class.retreated]="card.isRetreated"
+                            [class.selected]="selectedCard() === card.instanceId"
+                            draggable="true"
+                            (dragstart)="onDragStart($event, card, 'space')"
+                            (dragend)="onDragEnd()"
+                            (click)="selectCard(card.instanceId)"
+                            (dblclick)="zoomCard.set(card)"
+                            (contextmenu)="openCardMenu($event, card)"
+                          >
+                            <img
+                              [src]="
+                                card.isFaceDown
+                                  ? 'assets/card-back.jpg'
+                                  : card.cardImageUrl || 'assets/card-back.jpg'
+                              "
+                              [alt]="card.isFaceDown ? 'Face Down' : card.cardName"
+                            />
+                            @if (card.isTapped) {
+                              <div class="tapped-indicator tiny">TAP</div>
+                            }
+                            @if (card.counter !== null && card.counter !== undefined) {
+                              <div class="counter-badge tiny">{{ card.counter }}</div>
+                            }
+                            @if (card.damage !== null && card.damage !== undefined) {
+                              <div class="damage-badge tiny">{{ card.damage }}</div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    <div class="units-section">
+                      @for (card of myArenaUnits('space'); track card.instanceId) {
+                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)">
+                          <!-- Top card of the stack (rightmost due to row-reverse) -->
+                          <div
+                            class="game-card small stack-top"
+                            [class.tapped]="card.isTapped"
+                            [class.face-down]="card.isFaceDown"
+                            [class.retreated]="card.isRetreated"
+                            [class.selected]="selectedCard() === card.instanceId"
+                            draggable="true"
+                            (dragstart)="onDragStart($event, card, 'space')"
+                            (dragend)="onDragEnd()"
+                            (click)="selectCard(card.instanceId)"
+                            (dblclick)="zoomCard.set(card)"
+                            (contextmenu)="
+                              hasStack(card)
+                                ? openStackMenu($event, card)
+                                : openCardMenu($event, card)
+                            "
+                          >
+                            <img
+                              [src]="
+                                card.isFaceDown
+                                  ? 'assets/card-back.jpg'
+                                  : card.cardImageUrl || 'assets/card-back.jpg'
+                              "
+                              [alt]="card.isFaceDown ? 'Face Down' : card.cardName"
+                            />
+                            @if (!card.isFaceDown) {
+                              <div class="card-name">{{ card.cardName }}</div>
+                            }
+                            @if (card.isTapped) {
+                              <div class="tapped-indicator small">TAP</div>
+                            }
+                            @if (card.isRetreated) {
+                              <div class="retreated-indicator small">RETREAT</div>
+                            }
+                            @if (card.counter !== null && card.counter !== undefined) {
+                              <div class="counter-badge small">{{ card.counter }}</div>
+                            }
+                            @if (card.damage !== null && card.damage !== undefined) {
+                              <div class="damage-badge small">{{ card.damage }}</div>
+                            }
+                            @if (hasStack(card)) {
+                              <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                            }
+                            @if (card.version && !card.isFaceDown) {
+                              <div class="version-badge small">{{ card.version }}</div>
+                            }
+                          </div>
+                          <!-- Stacked cards (shown to the left of top card, showing right edge) -->
+                          @for (
+                            stackedCard of getMyStackedCards(card);
+                            track stackedCard.instanceId
+                          ) {
+                            <div
+                              class="game-card small stacked-card"
+                              [class.tapped]="stackedCard.isTapped"
+                              [class.face-down]="stackedCard.isFaceDown"
+                              (dblclick)="zoomCard.set(stackedCard)"
+                            >
+                              <img
+                                [src]="
+                                  stackedCard.isFaceDown
+                                    ? 'assets/card-back.jpg'
+                                    : stackedCard.cardImageUrl || 'assets/card-back.jpg'
+                                "
+                                [alt]="stackedCard.isFaceDown ? 'Face Down' : stackedCard.cardName"
+                              />
+                              @if (stackedCard.version) {
+                                <div class="version-badge small">{{ stackedCard.version }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+        <!-- Collapsible Bottom Controls -->
+        <div class="bottom-controls" [class.collapsed]="bottomControlsCollapsed()">
+          <button 
+            class="bottom-controls-toggle" 
+            (click)="bottomControlsCollapsed.set(!bottomControlsCollapsed())"
+            [title]="bottomControlsCollapsed() ? 'Expand controls' : 'Collapse controls'"
+          >
+            {{ bottomControlsCollapsed() ? '▲' : '▼' }}
+          </button>
+          
+          @if (!bottomControlsCollapsed()) {
+            <!-- Force and Build Controls -->
+            <div class="controls-row">
+              <div class="force-control">
+                <span class="control-label">Force:</span>
+                <button class="btn btn-sm btn-outline-light force-btn" (click)="decrementForce()">−</button>
+                <input
+                  type="number"
+                  class="force-input"
+                  [value]="myPlayer()?.force ?? 4"
+                  (change)="onForceChange($event)"
+                  min="0"
+                  max="99"
+                />
+                <button class="btn btn-sm btn-outline-light force-btn" (click)="incrementForce()">+</button>
+              </div>
+              <div class="build-control">
+                <span class="control-label">Build:</span>
+                <button class="btn btn-sm btn-outline-light force-btn" (click)="decrementBuild()">−</button>
+                <input
+                  type="number"
+                  class="force-input build-input"
+                  [value]="myPlayer()?.buildCounter ?? 60"
+                  (change)="onBuildChange($event)"
+                  min="0"
+                  max="99"
+                />
+                <button class="btn btn-sm btn-outline-light force-btn" (click)="incrementBuild()">+</button>
+              </div>
+              
+              <!-- Build Zone -->
+              <div
+                class="zone build-zone"
+                (click)="showBuildZone.set(!showBuildZone())"
+                (dragover)="onDragOver($event)"
+                (drop)="onDrop($event, 'build')"
+                [class.drag-over]="dragOverZone() === 'build'"
+              >
+                <div class="zone-label">BUILD ({{ myBuildZone().length }})</div>
+                <div class="build-stack">
+                  @if (myBuildZone().length > 0) {
+                    <div class="card-back"></div>
+                    <span class="build-count">{{ myBuildZone().length }}</span>
+                  } @else {
+                    <div class="empty-zone">Empty</div>
+                  }
+                </div>
+              </div>
+            </div>
+            
+            <!-- Hand, Deck, Discard Row -->
+            <div class="hand-row">
+          <!-- Left: Deck -->
+          <div
+            class="zone deck-zone"
+            (click)="drawCard()"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event, 'deck')"
+            [class.drag-over]="dragOverZone() === 'deck'"
+          >
+            <div class="zone-label">DECK</div>
+            <div class="deck-stack">
+              <div class="card-back"></div>
+              <span class="deck-count">{{ myDeckSize() }}</span>
+            </div>
+          </div>
+
+          <!-- Center: Hand -->
+          <div
+            class="zone hand-zone"
+            [class.minimized]="handMinimized()"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event, 'hand')"
+            [class.drag-over]="dragOverZone() === 'hand'"
+          >
+            <div class="hand-header">
+              <div class="zone-label">HAND ({{ myHand().length }})</div>
+              <button
+                class="hand-minimize-btn"
+                (click)="handMinimized.set(!handMinimized())"
+                [title]="handMinimized() ? 'Expand hand' : 'Minimize hand'"
+              >
+                {{ handMinimized() ? '▲' : '▼' }}
+              </button>
+            </div>
+            <div class="hand-cards">
+              @for (card of myHand(); track card.instanceId) {
+                <div
+                  class="game-card hand-card"
+                  [class.sideways]="card.cardType !== 0"
+                  [class.selected]="selectedCard() === card.instanceId"
+                  draggable="true"
+                  (dragstart)="onDragStart($event, card, 'hand')"
+                  (dragend)="onDragEnd()"
+                  (click)="selectCard(card.instanceId)"
+                  (dblclick)="zoomCard.set(card)"
+                  (contextmenu)="openHandCardMenu($event, card)"
+                >
+                  <img [src]="card.cardImageUrl || 'assets/card-back.jpg'" [alt]="card.cardName" />
+                  <div class="card-name">{{ card.cardName }}</div>
+                  @if (card.version) {
+                    <div class="version-badge">{{ card.version }}</div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Right: Discard -->
+          <div
+            class="zone discard-zone"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event, 'discard')"
+            [class.drag-over]="dragOverZone() === 'discard'"
+            (click)="showDiscard.set(!showDiscard())"
+          >
+            <div class="zone-label">DISCARD</div>
+            <div class="discard-stack">
+              @if (myDiscard().length > 0) {
+                <div class="game-card small">
+                  <img
+                    [src]="
+                      myDiscard()[myDiscard().length - 1].cardImageUrl || 'assets/card-back.jpg'
+                    "
+                  />
+                </div>
+              } @else {
+                <div class="empty-zone">Empty</div>
+              }
+              <span class="discard-count">{{ myDiscard().length }}</span>
+            </div>
+          </div>
+        </div>
+          }
+        </div>
+
+        <!-- Discard Modal -->
+        @if (showDiscard()) {
+          <div class="modal-overlay" (click)="showDiscard.set(false)">
+            <div class="modal-content" (click)="$event.stopPropagation()">
+              <h4>Discard Pile</h4>
+              <div class="modal-cards">
+                @for (card of myDiscard(); track card.instanceId) {
+                  <div
+                    class="game-card"
+                    [class.sideways]="card.cardType !== 0"
+                    draggable="true"
+                    (dragstart)="onDragStart($event, card, 'discard')"
+                    (dragend)="onDragEnd()"
+                    (contextmenu)="openDiscardCardMenu($event, card)"
+                  >
+                    <img
+                      [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                      [alt]="card.cardName"
+                    />
+                    <div class="card-name">{{ card.cardName }}</div>
+                    @if (card.version) {
+                      <div class="version-badge">{{ card.version }}</div>
+                    }
+                  </div>
+                } @empty {
+                  <p class="text-muted">No cards in discard</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="showDiscard.set(false)">Close</button>
+            </div>
+          </div>
+        }
+
+        <!-- Build Zone Modal -->
+        @if (showBuildZone()) {
+          <div class="modal-overlay" (click)="showBuildZone.set(false)">
+            <div class="modal-content" (click)="$event.stopPropagation()">
+              <h4>Build Zone ({{ myBuildZone().length }} cards)</h4>
+              <div class="modal-cards">
+                @for (card of myBuildZone(); track card.instanceId) {
+                  <div
+                    class="game-card"
+                    [class.sideways]="card.cardType !== 0"
+                    [class.has-counter]="card.counter !== null && card.counter !== undefined"
+                    draggable="true"
+                    (dragstart)="onDragStart($event, card, 'build')"
+                    (dragend)="onDragEnd()"
+                    (contextmenu)="openBuildCardMenu($event, card)"
+                  >
+                    <img
+                      [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                      [alt]="card.cardName"
+                    />
+                    <div class="card-name">{{ card.cardName }}</div>
+                    @if (card.version) {
+                      <div class="version-badge">{{ card.version }}</div>
+                    }
+                    @if (card.counter !== null && card.counter !== undefined) {
+                      <div class="counter-badge">{{ card.counter }}</div>
+                    }
+                  </div>
+                } @empty {
+                  <p class="text-muted">No cards in build zone</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="showBuildZone.set(false)">
+                Close
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Deck Browser Modal -->
+        @if (showDeckBrowser()) {
+          <div class="modal-overlay" (click)="showDeckBrowser.set(false)">
+            <div class="modal-content large" (click)="$event.stopPropagation()">
+              <h4>Browse Deck ({{ deckBrowserCards().length }} cards)</h4>
+              <div class="modal-cards scrollable">
+                @for (card of deckBrowserCards(); track card.instanceId) {
+                  <div
+                    class="game-card clickable"
+                    [class.sideways]="card.cardType !== 0"
+                    (click)="takeCardFromDeck(card.instanceId)"
+                    [title]="'Click to take ' + card.cardName + ' to hand'"
+                  >
+                    <img
+                      [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                      [alt]="card.cardName"
+                    />
+                    <div class="card-name">{{ card.cardName }}</div>
+                    @if (card.version) {
+                      <div class="version-badge">{{ card.version }}</div>
+                    }
+                  </div>
+                } @empty {
+                  <p class="text-muted">Deck is empty</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="showDeckBrowser.set(false)">
+                Close
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Card Context Menu (for cards in play) -->
+        @if (cardMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="cardMenuX()"
+            [style.top.px]="cardMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <button class="context-menu-item" (click)="zoomFromMenu()">Zoom</button>
+              <button class="context-menu-item" (click)="toggleTapFromMenu()">
+                {{ cardMenuCard()!.isTapped ? 'Untap' : 'Tap' }}
+              </button>
+              <hr class="context-menu-divider" />
+              <div class="context-menu-counter">
+                <span>Counter:</span>
+                <button class="btn btn-sm btn-outline-light" (click)="decrementCounter()">−</button>
+                <span class="counter-value">{{ cardMenuCard()!.counter ?? 0 }}</span>
+                <button class="btn btn-sm btn-outline-light" (click)="incrementCounter()">+</button>
+                @if (cardMenuCard()!.counter !== null && cardMenuCard()!.counter !== undefined) {
+                  <button class="btn btn-sm btn-outline-danger" (click)="removeCounter()">✕</button>
+                }
+              </div>
+              <div class="context-menu-counter">
+                <span>Damage:</span>
+                <button class="btn btn-sm btn-outline-light" (click)="decrementDamage()">−</button>
+                <span class="counter-value">{{ cardMenuCard()!.damage ?? 0 }}</span>
+                <button class="btn btn-sm btn-outline-light" (click)="incrementDamage()">+</button>
+                @if (cardMenuCard()!.damage !== null && cardMenuCard()!.damage !== undefined) {
+                  <button class="btn btn-sm btn-outline-danger" (click)="removeDamage()">✕</button>
+                }
+              </div>
+              <hr class="context-menu-divider" />
+              <button class="context-menu-item" (click)="moveToBuildFromMenu()">
+                Move to Build
+              </button>
+              <button class="context-menu-item" (click)="discardFromMenu()">Discard</button>
+              <button class="context-menu-item" (click)="returnToHandFromMenu()">
+                Return to Hand
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeCardMenu()"></div>
+        }
+
+        <!-- Opponent Card Context Menu (zoom only) -->
+        @if (opponentCardMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="cardMenuX()"
+            [style.top.px]="cardMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <button class="context-menu-item" (click)="zoomOpponentCard()">Zoom</button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeOpponentCardMenu()"></div>
+        }
+
+        <!-- Discard Card Context Menu (simplified - only return to hand) -->
+        @if (discardCardMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="discardCardMenuX()"
+            [style.top.px]="discardCardMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <button class="context-menu-item" (click)="returnToHandFromDiscardMenu()">
+                Return to Hand
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeDiscardCardMenu()"></div>
+        }
+
+        <!-- Hand Card Context Menu (for playing face down) -->
+        @if (handCardMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="cardMenuX()"
+            [style.top.px]="cardMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <div class="context-menu-label">Play to:</div>
+              <!-- For Unit cards with a designated arena, show only that arena -->
+              @if (handCardMenuCard()!.cardType === 0 && handCardMenuCard()!.cardArena) {
+                <button
+                  class="context-menu-item"
+                  (click)="playToArena(handCardMenuCard()!.cardArena!.toLowerCase())"
+                >
+                  {{ handCardMenuCard()!.cardArena | titlecase }} Arena
+                </button>
+              } @else {
+                <!-- For non-unit cards or units without designated arena, show all options -->
+                <button class="context-menu-item" (click)="playToArena('space')">
+                  Space Arena
+                </button>
+                <button class="context-menu-item" (click)="playToArena('ground')">
+                  Ground Arena
+                </button>
+                <button class="context-menu-item" (click)="playToArena('character')">
+                  Character Arena
+                </button>
+              }
+              <hr class="context-menu-divider" />
+              <!-- Stack onto existing card option (for versioned units) -->
+              @if (handCardMenuCard()!.version && handCardMenuCard()!.cardType === 0) {
+                <div class="context-menu-label">Stack onto (same name, diff version):</div>
+                @for (target of stackableTargets(); track target.instanceId) {
+                  <button
+                    class="context-menu-item"
+                    (click)="stackCardOnTarget(handCardMenuCard()!.instanceId, target.instanceId)"
+                  >
+                    {{ target.cardName }} ({{ target.version }}) - {{ target.cardArena }}
+                  </button>
+                }
+                @if (stackableTargets().length === 0) {
+                  <span
+                    class="context-menu-item"
+                    style="color: rgba(255, 255, 255, 0.5); cursor: default"
+                  >
+                    No stackable targets in arena
+                  </span>
+                }
+                <hr class="context-menu-divider" />
+              }
+              <button class="context-menu-item" (click)="moveToBuildFromHandMenu()">
+                Move to Build Zone
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeHandCardMenu()"></div>
+        }
+
+        <!-- Stack Context Menu (for changing stack top) -->
+        @if (stackMenuCard()) {
+          <div
+            class="stack-menu"
+            [style.left.px]="stackMenuX()"
+            [style.top.px]="stackMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="stack-menu-content">
+              <div class="stack-menu-title">Change Stack Top</div>
+              <!-- Current top card -->
+              <div class="stack-card-option" style="opacity: 0.6; cursor: default">
+                <img
+                  [src]="stackMenuCard()!.cardImageUrl || 'assets/card-back.jpg'"
+                  [alt]="stackMenuCard()!.cardName"
+                />
+                <div class="card-info">
+                  <div class="card-name">{{ stackMenuCard()!.cardName }}</div>
+                  <div class="version-label">
+                    Version {{ stackMenuCard()!.version }} (current top)
+                  </div>
+                </div>
+              </div>
+              <!-- Stacked cards that can become top -->
+              @for (
+                stackedCard of getMyStackedCards(stackMenuCard()!);
+                track stackedCard.instanceId
+              ) {
+                <button class="stack-card-option" (click)="setStackTop(stackedCard.instanceId)">
+                  <img
+                    [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                    [alt]="stackedCard.cardName"
+                  />
+                  <div class="card-info">
+                    <div class="card-name">{{ stackedCard.cardName }}</div>
+                    <div class="version-label">Version {{ stackedCard.version }}</div>
+                  </div>
+                </button>
+              }
+              <hr class="context-menu-divider" />
+              <button
+                class="context-menu-item"
+                (click)="openCardMenuFromStack($event)"
+              >
+                More Options...
+              </button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeStackMenu()"></div>
+        }
+
+        <!-- Build Card Context Menu -->
+        @if (buildCardMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="buildCardMenuX()"
+            [style.top.px]="buildCardMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <div class="context-menu-counter">
+                <span>Counter:</span>
+                <button class="btn btn-sm btn-outline-light" (click)="decrementBuildCardCounter()">
+                  −
+                </button>
+                <span class="counter-value">{{ buildCardMenuCard()!.counter ?? 0 }}</span>
+                <button class="btn btn-sm btn-outline-light" (click)="incrementBuildCardCounter()">
+                  +
+                </button>
+                @if (
+                  buildCardMenuCard()!.counter !== null &&
+                  buildCardMenuCard()!.counter !== undefined
+                ) {
+                  <button class="btn btn-sm btn-outline-danger" (click)="removeBuildCardCounter()">
+                    ✕
+                  </button>
+                }
+              </div>
+              <hr class="context-menu-divider" />
+              <div class="context-menu-label">Play to Arena:</div>
+              <!-- For Unit cards with a designated arena, show only that arena -->
+              @if (buildCardMenuCard()!.cardType === 0 && buildCardMenuCard()!.cardArena) {
+                <button
+                  class="context-menu-item"
+                  (click)="moveFromBuildTo(buildCardMenuCard()!.cardArena!.toLowerCase())"
+                >
+                  {{ buildCardMenuCard()!.cardArena | titlecase }} Arena
+                </button>
+              } @else {
+                <!-- For non-unit cards or units without designated arena, show all options -->
+                <button class="context-menu-item" (click)="moveFromBuildTo('space')">
+                  Space Arena
+                </button>
+                <button class="context-menu-item" (click)="moveFromBuildTo('ground')">
+                  Ground Arena
+                </button>
+                <button class="context-menu-item" (click)="moveFromBuildTo('character')">
+                  Character Arena
+                </button>
+              }
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeBuildCardMenu()"></div>
+        }
+
+        <!-- Opponent Build Zone Modal -->
+        @if (showOpponentBuildZone()) {
+          <div class="modal-overlay" (click)="showOpponentBuildZone.set(null)">
+            <div class="modal-content" (click)="$event.stopPropagation()">
+              <h4>
+                {{ showOpponentBuildZone()!.username }}'s Build Zone ({{
+                  showOpponentBuildZone()!.buildZone.length
+                }}
+                cards)
+              </h4>
+              <div class="modal-cards">
+                @for (card of showOpponentBuildZone()!.buildZone; track card.instanceId) {
+                  <div class="game-card" [class.sideways]="card.cardType !== 0">
+                    <img src="assets/card-back.jpg" alt="Face Down Card" />
+                    @if (card.counter !== null && card.counter !== undefined) {
+                      <div class="counter-badge">{{ card.counter }}</div>
+                    }
+                  </div>
+                } @empty {
+                  <p class="text-muted">No cards in build zone</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="showOpponentBuildZone.set(null)">
+                Close
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Zoom Modal -->
+        @if (zoomCard()) {
+          <div class="zoom-modal" (click)="zoomCard.set(null)">
+            <div class="zoom-card" [class.sideways]="isZoomCardSideways()">
+              <img
+                [src]="zoomCard()!.cardImageUrl || 'assets/card-back.jpg'"
+                [alt]="zoomCard()!.cardName"
+              />
+              @if (zoomCard()!.version) {
+                <div class="version-badge zoom">{{ zoomCard()!.version }}</div>
+              }
+            </div>
+            <div class="zoom-card-name">{{ zoomCard()!.cardName }}</div>
+          </div>
+        }
+
+        <!-- Side Panel -->
+        <div class="side-panel" [class.collapsed]="sidePanelCollapsed()">
+          <button class="panel-toggle" (click)="sidePanelCollapsed.set(!sidePanelCollapsed())">
+            {{ sidePanelCollapsed() ? '◀' : '▶' }}
+          </button>
+          @if (!sidePanelCollapsed()) {
+            <div class="panel-content">
+              <!-- Quick Actions -->
+              <div class="panel-section">
+                <h6>Actions</h6>
+                <div class="d-grid gap-1">
+                  <button class="btn btn-sm btn-primary" (click)="drawCard()">Draw Card</button>
+                  <button class="btn btn-sm btn-outline-primary" (click)="openDeckBrowser()">
+                    View Deck
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dice Roller -->
+              <div class="panel-section">
+                <h6>Dice</h6>
+                <div class="input-group input-group-sm">
+                  <input
+                    type="number"
+                    class="form-control"
+                    [formControl]="diceCount"
+                    min="1"
+                    max="20"
+                  />
+                  <button class="btn btn-outline-primary" (click)="rollDice()">Roll</button>
+                </div>
+                @if (lastDiceRoll()) {
+                  <div class="dice-results mt-2">
+                    <div class="small text-info mb-1">{{ lastDiceRoll()!.username }} rolled:</div>
+                    @for (result of lastDiceRoll()!.results; track $index) {
+                      <span class="badge bg-dark me-1">{{ result }}</span>
+                    }
+                  </div>
+                }
+              </div>
+
+              <!-- Players -->
+              <div class="panel-section">
+                <h6>Players</h6>
+                @for (player of room()!.players; track player.username) {
+                  <div class="player-info">
+                    <span>{{ player.username }}</span>
+                    <span class="badge bg-secondary">{{ getPlayerCardCount(player) }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Finished State -->
+      @if (room()!.state === GameState.Finished) {
+        <div class="waiting-overlay">
+          <div class="waiting-content">
+            <h2>Game Over!</h2>
+            <p class="lead">Thanks for playing.</p>
+            <a routerLink="/play" class="btn btn-primary">Back to Lobby</a>
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="loading-overlay">
+      <div class="spinner-border text-light"></div>
+      <p class="mt-3 text-light">Connecting to room...</p>
+    </div>
+  }
+</div>

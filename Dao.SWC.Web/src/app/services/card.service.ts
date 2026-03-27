@@ -20,6 +20,9 @@ export class CardService {
       if (filter.search) {
         params = params.set('search', filter.search);
       }
+      if (filter.searchByName !== undefined) {
+        params = params.set('searchByName', filter.searchByName.toString());
+      }
       if (filter.type !== undefined) {
         params = params.set('type', filter.type.toString());
       }

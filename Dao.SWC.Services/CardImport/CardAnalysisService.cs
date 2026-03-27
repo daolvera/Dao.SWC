@@ -1,12 +1,12 @@
-using System.ClientModel;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using Azure.AI.OpenAI;
 using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
+using System.ClientModel;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Dao.SWC.Services.CardImport;
 
@@ -82,6 +82,9 @@ public partial class CardAnalysisService : ICardAnalysisService
             new UserChatMessage(
                 ChatMessageContentPart.CreateTextPart(
                     $"Analyze this Star Wars TCG card. The filename is: {fileName}"
+                ),
+                ChatMessageContentPart.CreateTextPart(
+                    $"Non units are sideways cards. Units are vertical. Purple outlines are for Characters, Green is for Ground, and Blue is for Space. The Red lightsaber in the corner is for Dark side cards, a blue lightsaber is for Light side cards, and a yello and brown bounty hunter symbol in the corner is for Neutral."
                 ),
                 ChatMessageContentPart.CreateImagePart(
                     BinaryData.FromBytes(imageBytes),

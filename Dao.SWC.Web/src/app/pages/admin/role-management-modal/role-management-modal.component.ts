@@ -164,6 +164,7 @@ export class RoleManagementModalComponent {
         this.newEmail = '';
         this.assigning.set(false);
         this.loadUsers();
+        window.location.reload();
       },
       error: (err) => {
         this.message.set(err.error?.title || err.error?.message || 'Failed to assign role');
@@ -180,6 +181,7 @@ export class RoleManagementModalComponent {
       next: () => {
         this.removing.set(null);
         this.loadUsers();
+        window.location.reload();
       },
       error: () => {
         this.removing.set(null);

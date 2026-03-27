@@ -32,7 +32,7 @@ public class AuthController(
     [ProducesResponseType(401)]
     public async Task<IActionResult> GetUserDetails()
     {
-        AppUser? user = await UserManager.FindByIdAsync(User.GetAppUserId());
+        AppUser? user = await UserManager.FindByIdAsync(User.GetAppUserId() ?? throw new InvalidOperationException("User ID is not available"));
         if (user == null)
         {
             return Unauthorized();
@@ -47,9 +47,17 @@ public class AuthController(
     [HttpDelete("logout")]
     public IActionResult Logout()
     {
-        Response.Cookies.Delete(Constants.Authentication.AccessTokenCookieKey);
-        Response.Cookies.Delete(Constants.Authentication.RefreshTokenCookieKey);
-        Response.Cookies.Delete(Constants.Authentication.IsAuthenticatedCookieKey);
+        var cookieDomain = GetSharedCookieDomain();
+        var deleteOptions = new CookieOptions
+        {
+            Domain = cookieDomain,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+        };
+
+        Response.Cookies.Delete(Constants.Authentication.AccessTokenCookieKey, deleteOptions);
+        Response.Cookies.Delete(Constants.Authentication.RefreshTokenCookieKey, deleteOptions);
+        Response.Cookies.Delete(Constants.Authentication.IsAuthenticatedCookieKey, deleteOptions);
 
         return Ok();
     }

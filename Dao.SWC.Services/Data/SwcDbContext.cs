@@ -8,11 +8,18 @@ namespace Dao.SWC.Services.Data;
 public class SwcDbContext : IdentityDbContext<AppUser>
 {
     public SwcDbContext(DbContextOptions<SwcDbContext> options)
-        : base(options) { }
+        : base(options)
+    {
+    }
 
     public DbSet<Card> Cards => Set<Card>();
     public DbSet<Deck> Decks => Set<Deck>();
     public DbSet<DeckCard> DeckCards => Set<DeckCard>();
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

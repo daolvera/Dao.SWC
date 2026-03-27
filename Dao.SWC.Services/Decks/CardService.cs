@@ -10,22 +10,22 @@ namespace Dao.SWC.Services.Decks;
 
 public class CardService(SwcDbContext dbContext, ICardImageService imageService) : ICardService
 {
-    public async Task<PagedResult<CardDto>> GetCardsPagedAsync(CardFilterDto? filter = null)
+    public async Task<PagedResult<CardDto>> GetCardsPagedAsync(CardFilterVm? filter = null)
     {
-        filter ??= new CardFilterDto();
+        filter ??= new CardFilterVm();
 
         var query = dbContext.Cards.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var search = filter.Search.ToLower();
-            query = query.Where(c =>
-                c.Name.Contains(search, StringComparison.CurrentCultureIgnoreCase)
-                || (
-                    c.CardText != null
-                    && c.CardText.Contains(search, StringComparison.CurrentCultureIgnoreCase)
-                )
-            );
+            query = filter.SearchByName ?
+                query.Where(c =>
+                    c.Name.ToLower().Contains(search)) :
+                query.Where(c =>
+                        c.CardText != null
+                        && c.CardText.ToLower().Contains(search)
+                    );
         }
 
         if (filter.Type.HasValue)

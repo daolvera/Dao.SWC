@@ -30,10 +30,16 @@ public record GamePlayerDto(
     bool IsHost,
     bool IsConnected,
     int Force,
+    int BuildCounter,
     IEnumerable<CardInstanceDto> Hand,
+    int HandSize,
     int DeckSize,
     Dictionary<string, IEnumerable<CardInstanceDto>> Arenas,
-    IEnumerable<CardInstanceDto> DiscardPile
+    IEnumerable<CardInstanceDto> DiscardPile,
+    IEnumerable<CardInstanceDto> BuildZone,
+    bool SpaceArenaRetreated,
+    bool GroundArenaRetreated,
+    bool CharacterArenaRetreated
 );
 
 public record CardInstanceDto(
@@ -42,7 +48,15 @@ public record CardInstanceDto(
     string CardName,
     string? CardImageUrl,
     int CardType,
-    bool IsTapped
+    string? CardArena,
+    string? Version,
+    bool IsTapped,
+    bool IsFaceDown,
+    bool IsRetreated,
+    int? Counter,
+    int? Damage,
+    string? StackParentId,
+    IEnumerable<string> StackedUnderIds
 );
 
 public record DiceRolledEvent(string Username, int[] Results);
@@ -98,3 +112,17 @@ public record CardsDrawnEvent(string UserId, int Count);
 public record CardPlayedEvent(string UserId, CardInstanceDto Card);
 
 public record CardDiscardedEvent(string UserId, CardInstanceDto Card);
+
+// Stack operation result DTOs
+public record StackResultDto(
+    bool Success,
+    string? ErrorMessage,
+    CardInstanceDto? TopCard
+);
+
+public record PlayCardResultDto(
+    bool Success,
+    string? ErrorMessage,
+    CardInstanceDto? Card,
+    bool WasAutoStacked
+);

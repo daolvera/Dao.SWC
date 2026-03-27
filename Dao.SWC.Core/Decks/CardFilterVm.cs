@@ -1,7 +1,8 @@
 namespace Dao.SWC.Core.Decks;
 
-public record CardFilterDto(
+public record CardFilterVm(
     string? Search = null,
+    bool SearchByName = true,
     Enums.CardType? Type = null,
     Enums.Alignment? Alignment = null,
     Enums.Arena? Arena = null,

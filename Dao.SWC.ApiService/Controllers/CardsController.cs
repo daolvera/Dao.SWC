@@ -19,6 +19,7 @@ public class CardsController(ICardService cardService, ICardImageService imageSe
     [ProducesResponseType(typeof(PagedResult<CardDto>), 200)]
     public async Task<IActionResult> GetCards(
         [FromQuery] string? search = null,
+        [FromQuery] bool searchByName = true,
         [FromQuery] CardType? type = null,
         [FromQuery] Alignment? alignment = null,
         [FromQuery] Arena? arena = null,
@@ -26,7 +27,7 @@ public class CardsController(ICardService cardService, ICardImageService imageSe
         [FromQuery] int pageSize = 50
     )
     {
-        var filter = new CardFilterDto(search, type, alignment, arena, page, pageSize);
+        var filter = new CardFilterVm(search, searchByName, type, alignment, arena, page, pageSize);
         var result = await cardService.GetCardsPagedAsync(filter);
         return Ok(result);
     }

@@ -26,4 +26,5 @@ public enum CardZone
     Hand,
     PlayArea,
     Discard,
+    BuildZone,
 }

@@ -3,7 +3,7 @@ import * as signalR from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Alignment } from '../models/dtos/card.dto';
-import { CardInstanceDto, DiceRolledEvent, GameRoomDto, RoomType } from '../models/dtos/game.dto';
+import { CardInstanceDto, DiceRolledEvent, GameRoomDto, PlayCardResultDto, RoomType, StackResultDto } from '../models/dtos/game.dto';
 import { AuthService } from './auth.service';
 
 interface SignalRTokenResponse {
@@ -212,9 +212,11 @@ export class GameHubService {
     await this.hubConnection.invoke('DrawCards', count);
   }
 
-  async playCard(cardInstanceId: string, arena: string): Promise<void> {
-    if (!this.hubConnection || !this._currentRoomCode) return;
-    await this.hubConnection.invoke('PlayCard', cardInstanceId, arena);
+  async playCard(cardInstanceId: string, arena: string): Promise<PlayCardResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected', card: null, wasAutoStacked: false };
+    }
+    return await this.hubConnection.invoke<PlayCardResultDto>('PlayCard', cardInstanceId, arena);
   }
 
   async discardCard(cardInstanceId: string): Promise<void> {
@@ -255,6 +257,97 @@ export class GameHubService {
   async updateForce(force: number): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('UpdateForce', force);
+  }
+
+  async toggleFaceDown(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ToggleFaceDown', cardInstanceId);
+  }
+
+  async setCounter(cardInstanceId: string, counter: number): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('SetCounter', cardInstanceId, counter);
+  }
+
+  async removeCounter(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('RemoveCounter', cardInstanceId);
+  }
+
+  async setDamage(cardInstanceId: string, damage: number): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('SetDamage', cardInstanceId, damage);
+  }
+
+  async removeDamage(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('RemoveDamage', cardInstanceId);
+  }
+
+  async playCardFaceDown(cardInstanceId: string, arena: string): Promise<PlayCardResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected', card: null, wasAutoStacked: false };
+    }
+    return await this.hubConnection.invoke<PlayCardResultDto>('PlayCardFaceDown', cardInstanceId, arena);
+  }
+
+  async moveToBuild(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('MoveToBuild', cardInstanceId);
+  }
+
+  async toggleArenaRetreat(arena: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ToggleArenaRetreat', arena);
+  }
+
+  async moveFromBuild(cardInstanceId: string, arena: string): Promise<PlayCardResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected to a room', card: null, wasAutoStacked: false };
+    }
+    return await this.hubConnection.invoke<PlayCardResultDto>('MoveFromBuild', cardInstanceId, arena);
+  }
+
+  async updateBuildCounter(buildCounter: number): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('UpdateBuildCounter', buildCounter);
+  }
+
+  // Card Stacking methods
+
+  async stackCard(cardToStackId: string, targetCardId: string): Promise<StackResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected to a room', topCard: null };
+    }
+    return await this.hubConnection.invoke<StackResultDto>(
+      'StackCard',
+      cardToStackId,
+      targetCardId,
+    );
+  }
+
+  async setStackTop(
+    currentTopCardId: string,
+    newTopCardId: string,
+  ): Promise<StackResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected to a room', topCard: null };
+    }
+    return await this.hubConnection.invoke<StackResultDto>(
+      'SetStackTop',
+      currentTopCardId,
+      newTopCardId,
+    );
+  }
+
+  async getStackableCards(cardInstanceId: string): Promise<CardInstanceDto[]> {
+    if (!this.hubConnection || !this._currentRoomCode) return [];
+    return await this.hubConnection.invoke<CardInstanceDto[]>('GetStackableCards', cardInstanceId);
+  }
+
+  async canPlayVersionedCard(cardInstanceId: string): Promise<boolean> {
+    if (!this.hubConnection || !this._currentRoomCode) return true;
+    return await this.hubConnection.invoke<boolean>('CanPlayVersionedCard', cardInstanceId);
   }
 
   private extractUsername(room: GameRoomDto): string | null {

@@ -293,30 +293,39 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     /// <summary>
     /// Play a card from hand to an arena.
     /// </summary>
-    public async Task PlayCard(string cardInstanceId, string arena)
+    public async Task<PlayCardResultDto> PlayCard(string cardInstanceId, string arena)
     {
         var userId = Context.User?.GetAppUserId();
         var roomCode = GetCurrentRoomCode();
         if (userId == null || roomCode == null)
-            return;
+            return new PlayCardResultDto(false, "Not connected to a room", null, false);
 
         if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
-            return;
+            return new PlayCardResultDto(false, "Invalid card ID format", null, false);
 
-        var card = await gameRoomService.PlayCardAsync(
+        var result = await gameRoomService.PlayCardAsync(
             roomCode,
             userId,
             instanceGuid,
             arena: arena
         );
-        if (card != null)
+
+        if (result.Success && result.Card != null)
         {
             var room = gameRoomService.GetRoom(roomCode);
             if (room != null)
             {
                 await SendRoomUpdateToGroupAsync(room);
             }
+            return new PlayCardResultDto(
+                true,
+                null,
+                MapToCardInstanceDto(result.Card),
+                result.WasAutoStacked
+            );
         }
+
+        return new PlayCardResultDto(false, result.ErrorMessage, null, false);
     }
 
     /// <summary>
@@ -499,6 +508,262 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
         }
     }
 
+    /// <summary>
+    /// Toggle face down state of a card in play.
+    /// </summary>
+    public async Task ToggleFaceDown(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.ToggleFaceDownAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set or update the counter on a card.
+    /// </summary>
+    public async Task SetCounter(string cardInstanceId, int counter)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.SetCounterAsync(roomCode, userId, instanceGuid, counter);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Remove the counter from a card.
+    /// </summary>
+    public async Task RemoveCounter(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.RemoveCounterAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set or update the damage on a card (only for cards in arena).
+    /// </summary>
+    public async Task SetDamage(string cardInstanceId, int damage)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.SetDamageAsync(roomCode, userId, instanceGuid, damage);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Remove the damage from a card.
+    /// </summary>
+    public async Task RemoveDamage(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.RemoveDamageAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Play a card from hand to an arena face down.
+    /// </summary>
+    public async Task<PlayCardResultDto> PlayCardFaceDown(string cardInstanceId, string arena)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return new PlayCardResultDto(false, "Not connected to a room", null, false);
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return new PlayCardResultDto(false, "Invalid card ID format", null, false);
+
+        var result = await gameRoomService.PlayCardFaceDownAsync(
+            roomCode,
+            userId,
+            instanceGuid,
+            arena: arena
+        );
+
+        if (result.Success && result.Card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new PlayCardResultDto(
+                true,
+                null,
+                MapToCardInstanceDto(result.Card),
+                result.WasAutoStacked
+            );
+        }
+
+        return new PlayCardResultDto(false, result.ErrorMessage, null, false);
+    }
+
+    /// <summary>
+    /// Move a card to the build zone.
+    /// </summary>
+    public async Task MoveToBuild(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.MoveToBuildAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Toggle retreat state of an entire arena.
+    /// </summary>
+    public async Task ToggleArenaRetreat(string arena)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var success = await gameRoomService.ToggleArenaRetreatAsync(roomCode, userId, arena);
+        if (success)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Move a card from build zone to play area.
+    /// </summary>
+    public async Task<PlayCardResultDto> MoveFromBuild(string cardInstanceId, string arena)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return new PlayCardResultDto(false, "Not connected to a room", null, false);
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return new PlayCardResultDto(false, "Invalid card ID format", null, false);
+
+        var result = await gameRoomService.MoveFromBuildAsync(roomCode, userId, instanceGuid, arena);
+        if (result.Success && result.Card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new PlayCardResultDto(
+                true,
+                null,
+                MapToCardInstanceDto(result.Card),
+                result.WasAutoStacked
+            );
+        }
+
+        return new PlayCardResultDto(false, result.ErrorMessage, null, false);
+    }
+
+    /// <summary>
+    /// Update the player's Build counter.
+    /// </summary>
+    public async Task UpdateBuildCounter(int buildCounter)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var success = await gameRoomService.UpdateBuildCounterAsync(roomCode, userId, buildCounter);
+        if (success)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
     #region Helpers
 
     private static string GetRoomGroup(string roomCode) =>
@@ -543,7 +808,9 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             player.UserId == hostUserId,
             player.IsConnected,
             player.Force,
+            player.BuildCounter,
             isMe ? player.Hand.Select(MapToCardInstanceDto) : [],
+            player.Hand.Count(),
             player.Deck.Count(),
             new Dictionary<string, IEnumerable<CardInstanceDto>>
             {
@@ -551,20 +818,160 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
                 ["ground"] = player.GroundArena.Select(MapToCardInstanceDto),
                 ["character"] = player.CharacterArena.Select(MapToCardInstanceDto),
             },
-            player.DiscardPile.Select(MapToCardInstanceDto)
+            player.DiscardPile.Select(MapToCardInstanceDto),
+            player.BuildArea.Select(MapToCardInstanceDto),
+            player.SpaceArenaRetreated,
+            player.GroundArenaRetreated,
+            player.CharacterArenaRetreated
         );
     }
 
     private static CardInstanceDto MapToCardInstanceDto(CardInstance card)
     {
+        // Use current arena if card is in play area, otherwise use designated arena
+        var arena = card.Zone == Core.GameRoom.CardZone.PlayArea ? card.Arena : card.DesignatedArena;
+        
         return new CardInstanceDto(
             card.InstanceId.ToString(),
             card.CardId,
             card.CardName,
             card.ImageUrl,
             (int)card.CardType,
-            card.IsTapped
+            arena,
+            card.Version,
+            card.IsTapped,
+            card.IsFaceDown,
+            card.IsRetreated,
+            card.Counter,
+            card.Damage,
+            card.StackParentId?.ToString(),
+            card.StackedUnderIds.Select(id => id.ToString())
         );
+    }
+
+    #endregion
+
+    #region Card Stacking
+
+    /// <summary>
+    /// Stack a versioned unit card under another card of the same name but different version.
+    /// </summary>
+    public async Task<StackResultDto> StackCard(string cardToStackId, string targetCardId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return new StackResultDto(false, "Not connected to a room", null);
+        }
+
+        if (
+            !Guid.TryParse(cardToStackId, out var cardToStackGuid)
+            || !Guid.TryParse(targetCardId, out var targetCardGuid)
+        )
+        {
+            return new StackResultDto(false, "Invalid card ID format", null);
+        }
+
+        var result = await gameRoomService.StackCardAsync(
+            roomCode,
+            userId,
+            cardToStackGuid,
+            targetCardGuid
+        );
+
+        if (result.Success && result.TopCard != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new StackResultDto(true, null, MapToCardInstanceDto(result.TopCard));
+        }
+
+        return new StackResultDto(false, result.ErrorMessage, null);
+    }
+
+    /// <summary>
+    /// Change which card is on top of a stack.
+    /// </summary>
+    public async Task<StackResultDto> SetStackTop(string currentTopCardId, string newTopCardId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return new StackResultDto(false, "Not connected to a room", null);
+        }
+
+        if (
+            !Guid.TryParse(currentTopCardId, out var currentTopGuid)
+            || !Guid.TryParse(newTopCardId, out var newTopGuid)
+        )
+        {
+            return new StackResultDto(false, "Invalid card ID format", null);
+        }
+
+        var result = await gameRoomService.SetStackTopAsync(
+            roomCode,
+            userId,
+            currentTopGuid,
+            newTopGuid
+        );
+
+        if (result.Success && result.TopCard != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new StackResultDto(true, null, MapToCardInstanceDto(result.TopCard));
+        }
+
+        return new StackResultDto(false, result.ErrorMessage, null);
+    }
+
+    /// <summary>
+    /// Get cards that can be stacked with the given card.
+    /// </summary>
+    public Task<IEnumerable<CardInstanceDto>> GetStackableCards(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return Task.FromResult<IEnumerable<CardInstanceDto>>([]);
+        }
+
+        if (!Guid.TryParse(cardInstanceId, out var cardGuid))
+        {
+            return Task.FromResult<IEnumerable<CardInstanceDto>>([]);
+        }
+
+        var stackableCards = gameRoomService.GetStackableCards(roomCode, userId, cardGuid);
+        return Task.FromResult(stackableCards.Select(MapToCardInstanceDto));
+    }
+
+    /// <summary>
+    /// Check if a versioned card can be played independently (not must-stack).
+    /// </summary>
+    public Task<bool> CanPlayVersionedCard(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return Task.FromResult(false);
+        }
+
+        if (!Guid.TryParse(cardInstanceId, out var cardGuid))
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(gameRoomService.CanPlayVersionedCard(roomCode, userId, cardGuid));
     }
 
     #endregion
