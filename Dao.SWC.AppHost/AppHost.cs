@@ -2,7 +2,7 @@ using Dao.SWC.Core;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-//var keyVault = builder.AddAzureKeyVault(Constants.ProjectNames.KeyVault);
+var keyVault = builder.AddAzureKeyVault(Constants.ProjectNames.KeyVault);
 
 var postgres = builder.AddAzurePostgresFlexibleServer("postgres")
                     .RunAsContainer(container =>
@@ -10,7 +10,7 @@ var postgres = builder.AddAzurePostgresFlexibleServer("postgres")
                         container.WithDataVolume();
                     });
 
-//var insights = builder.AddAzureApplicationInsights(Constants.ProjectNames.AppInsights);
+var insights = builder.AddAzureApplicationInsights(Constants.ProjectNames.AppInsights);
 
 var swcDb = postgres.AddDatabase(Constants.ProjectNames.Database);
 
@@ -30,8 +30,8 @@ var cardImporter = builder
     .AddProject<Projects.Dao_SWC_CardImporter>(Constants.ProjectNames.CardImporter)
     .WithReference(swcDb)
     .WithReference(blobs)
-    //.WithReference(keyVault)
-    //.WithReference(insights)
+    .WithReference(keyVault)
+    .WithReference(insights)
     .WaitFor(migrations)
     .WithExplicitStart();
 
@@ -41,8 +41,8 @@ var apiService = builder
     .WaitFor(migrations)
     .WithReference(swcDb)
     .WithReference(blobs)
-    //.WithReference(insights)
-    //.WithReference(keyVault)
+    .WithReference(insights)
+    .WithReference(keyVault)
     .WithHttpHealthCheck("/health");
 
 var webApp = builder
