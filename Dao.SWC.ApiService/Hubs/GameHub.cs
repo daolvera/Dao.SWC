@@ -975,4 +975,34 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     }
 
     #endregion
+
+    #region Chat
+
+    /// <summary>
+    /// Send a chat message to all players in the current room.
+    /// </summary>
+    public async Task SendChatMessage(string message)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        var displayName = Context.User?.FindFirstValue(ClaimTypes.Email);
+
+        if (userId == null || roomCode == null || string.IsNullOrEmpty(displayName))
+        {
+            return;
+        }
+
+        // Sanitize and limit message length
+        message = message?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(message) || message.Length > 500)
+        {
+            return;
+        }
+
+        await Clients
+            .Group(GetRoomGroup(roomCode))
+            .SendAsync("ChatMessageReceived", displayName, message);
+    }
+
+    #endregion
 }

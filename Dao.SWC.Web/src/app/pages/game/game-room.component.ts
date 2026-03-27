@@ -16,6 +16,7 @@ import { Subscription } from 'rxjs';
 import { TitleCasePipe } from '@angular/common';
 import {
   CardInstanceDto,
+  ChatMessage,
   DiceRolledEvent,
   GamePlayerDto,
   GameRoomDto,
@@ -71,6 +72,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   handMinimized = signal(false);
   bottomControlsCollapsed = signal(false);
   zoomCard = signal<CardInstanceDto | null>(null);
+
+  // Chat state
+  chatMessages = signal<ChatMessage[]>([]);
+  chatInput = new FormControl('');
+  @ViewChild('chatMessagesContainer') chatMessagesContainer!: ElementRef<HTMLElement>;
   
   // Computed: check if zoomed card should be displayed sideways (non-unit cards)
   isZoomCardSideways = computed(() => {
@@ -319,6 +325,16 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       }),
       this.gameHub.error$.subscribe((error) => {
         console.error('Game error:', error);
+      }),
+      this.gameHub.chatMessage$.subscribe((message) => {
+        this.chatMessages.update((messages) => [...messages, message]);
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          if (this.chatMessagesContainer) {
+            this.chatMessagesContainer.nativeElement.scrollTop =
+              this.chatMessagesContainer.nativeElement.scrollHeight;
+          }
+        }, 0);
       }),
     );
 
@@ -703,6 +719,25 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   async rollDice(): Promise<void> {
     const count = this.diceCount.value ?? 1;
     await this.gameHub.rollDice(count);
+  }
+
+  async sendChatMessage(): Promise<void> {
+    const message = this.chatInput.value?.trim();
+    if (!message) return;
+    await this.gameHub.sendChatMessage(message);
+    this.chatInput.setValue('');
+  }
+
+  linkifyMessage(message: string): string {
+    // Escape HTML first to prevent XSS
+    const escaped = message
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    // Convert URLs to clickable links
+    const urlPattern = /(https?:\/\/[^\s<]+)/g;
+    return escaped.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
   }
 
   async kickPlayer(username: string): Promise<void> {

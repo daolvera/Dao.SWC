@@ -984,6 +984,75 @@
         text-align: center;
       }
 
+      /* Chat */
+      .chat-section {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        border-bottom: none !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0.5rem !important;
+      }
+
+      .chat-messages {
+        flex: 1;
+        min-height: 80px;
+        max-height: 150px;
+        overflow-y: auto;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.75rem;
+      }
+
+      .chat-message {
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        word-wrap: break-word;
+
+        &:last-child {
+          margin-bottom: 0;
+          padding-bottom: 0;
+          border-bottom: none;
+        }
+      }
+
+      .chat-username {
+        color: #6ea8fe;
+        font-weight: 600;
+        font-size: 0.7rem;
+        margin-bottom: 0.125rem;
+      }
+
+      .chat-text {
+        color: #e0e0e0;
+        word-break: break-word;
+
+        a {
+          color: #8bb9fe;
+          text-decoration: underline;
+
+          &:hover {
+            color: #aecfff;
+          }
+        }
+      }
+
+      .chat-empty {
+        color: rgba(255, 255, 255, 0.4);
+        font-style: italic;
+        text-align: center;
+      }
+
+      .chat-input {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
       /* Modal */
       .modal-overlay {
         position: fixed;

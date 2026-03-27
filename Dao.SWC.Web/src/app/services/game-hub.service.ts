@@ -3,7 +3,7 @@ import * as signalR from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Alignment } from '../models/dtos/card.dto';
-import { CardInstanceDto, DiceRolledEvent, GameRoomDto, PlayCardResultDto, RoomType, StackResultDto } from '../models/dtos/game.dto';
+import { CardInstanceDto, ChatMessage, DiceRolledEvent, GameRoomDto, PlayCardResultDto, RoomType, StackResultDto } from '../models/dtos/game.dto';
 import { AuthService } from './auth.service';
 
 interface SignalRTokenResponse {
@@ -30,6 +30,7 @@ export class GameHubService {
   public diceRolled$ = new Subject<DiceRolledEvent>();
   public kicked$ = new Subject<string>();
   public error$ = new Subject<string>();
+  public chatMessage$ = new Subject<ChatMessage>();
 
   get currentUser(): string | null {
     return this._currentUser;
@@ -118,6 +119,11 @@ export class GameHubService {
     this.hubConnection.on('Error', (message: string) => {
       this._pendingError = message;
       this.error$.next(message);
+    });
+
+    // Chat messages
+    this.hubConnection.on('ChatMessageReceived', (username: string, message: string) => {
+      this.chatMessage$.next({ username, message });
     });
 
     this.hubConnection.onreconnecting(() => {
@@ -348,6 +354,13 @@ export class GameHubService {
   async canPlayVersionedCard(cardInstanceId: string): Promise<boolean> {
     if (!this.hubConnection || !this._currentRoomCode) return true;
     return await this.hubConnection.invoke<boolean>('CanPlayVersionedCard', cardInstanceId);
+  }
+
+  // Chat
+
+  async sendChatMessage(message: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('SendChatMessage', message);
   }
 
   private extractUsername(room: GameRoomDto): string | null {

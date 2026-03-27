@@ -159,3 +159,9 @@ export interface PlayCardResultDto {
   card: CardInstanceDto | null;
   wasAutoStacked: boolean;
 }
+
+// Chat message
+export interface ChatMessage {
+  username: string;
+  message: string;
+}

@@ -1462,6 +1462,32 @@
                   </div>
                 }
               </div>
+
+              <!-- Chat -->
+              <div class="panel-section chat-section">
+                <h6>Chat</h6>
+                <div class="chat-messages" #chatMessagesContainer>
+                  @for (msg of chatMessages(); track $index) {
+                    <div class="chat-message">
+                      <div class="chat-username">{{ msg.username }}</div>
+                      <div class="chat-text" [innerHTML]="linkifyMessage(msg.message)"></div>
+                    </div>
+                  }
+                  @if (chatMessages().length === 0) {
+                    <div class="chat-empty">No messages yet</div>
+                  }
+                </div>
+                <div class="chat-input">
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    placeholder="Type a message..."
+                    [formControl]="chatInput"
+                    (keyup.enter)="sendChatMessage()"
+                  />
+                  <button class="btn btn-sm btn-primary w-100" (click)="sendChatMessage()">Send</button>
+                </div>
+              </div>
             </div>
           }
         </div>
