@@ -15,7 +15,6 @@
     <PackageReference Include="Aspire.Azure.Security.KeyVault" Version="13.2.0" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.2.0" />
     <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.2.0" />
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
   </ItemGroup>
   <ItemGroup>

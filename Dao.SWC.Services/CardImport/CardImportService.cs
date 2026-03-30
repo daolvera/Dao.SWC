@@ -9,13 +9,13 @@ using Microsoft.Extensions.Options;
 namespace Dao.SWC.Services.CardImport;
 
 /// <summary>
-/// Orchestrates the card import process: iterates directories, uploads images,
-/// analyzes with AI, and persists to database.
+/// Orchestrates the card import process: iterates directories, reads CSV mappings,
+/// uploads images, and persists to database.
 /// </summary>
 public class CardImportService : ICardImportService
 {
     private readonly SwcDbContext _dbContext;
-    private readonly ICardAnalysisService _analysisService;
+    private readonly ICsvCardMappingService _csvMappingService;
     private readonly ICardImageService _imageService;
     private readonly CardImportOptions _options;
     private readonly ILogger<CardImportService> _logger;
@@ -24,14 +24,14 @@ public class CardImportService : ICardImportService
 
     public CardImportService(
         SwcDbContext dbContext,
-        ICardAnalysisService analysisService,
+        ICsvCardMappingService csvMappingService,
         ICardImageService imageService,
         IOptions<CardImportOptions> options,
         ILogger<CardImportService> logger
     )
     {
         _dbContext = dbContext;
-        _analysisService = analysisService;
+        _csvMappingService = csvMappingService;
         _imageService = imageService;
         _options = options.Value;
         _logger = logger;
@@ -93,7 +93,7 @@ public class CardImportService : ICardImportService
                     break;
                 }
 
-                var result = await ProcessCardAsync(imageFile, packName, dryRun, cancellationToken);
+                var result = await ProcessCardAsync(imageFile, packName, packDir, dryRun, cancellationToken);
                 results.Add(result);
                 OnCardProcessed?.Invoke(result);
 
@@ -131,6 +131,7 @@ public class CardImportService : ICardImportService
     private async Task<CardImportResult> ProcessCardAsync(
         string imageFile,
         string packName,
+        string packDirectory,
         bool dryRun,
         CancellationToken cancellationToken
     )
@@ -140,19 +141,29 @@ public class CardImportService : ICardImportService
 
         try
         {
-            // Read image file
-            await using var imageStream = File.OpenRead(imageFile);
-
-            // Analyze with AI
-            var analysis = await _analysisService.AnalyzeCardImageAsync(
-                imageStream,
+            // Get card data from CSV mapping
+            var mapping = await _csvMappingService.GetCardMappingAsync(
+                packDirectory,
                 fileName,
                 cancellationToken
             );
 
+            if (mapping == null)
+            {
+                _logger.LogWarning("No CSV mapping found for: {FileName}", fileName);
+                return new CardImportResult
+                {
+                    FileName = fileName,
+                    PackName = packName,
+                    Success = false,
+                    Skipped = true,
+                    SkipReason = "No mapping in cards.csv",
+                };
+            }
+
             // Check if card already exists
             var existingCard = await _dbContext.Cards.FirstOrDefaultAsync(
-                c => c.Name == analysis.Name && c.Version == analysis.Version,
+                c => c.Name == mapping.Name && c.Version == mapping.Version,
                 cancellationToken
             );
 
@@ -160,8 +171,8 @@ public class CardImportService : ICardImportService
             {
                 _logger.LogDebug(
                     "Card already exists: {Name} {Version}",
-                    analysis.Name,
-                    analysis.Version
+                    mapping.Name,
+                    mapping.Version
                 );
                 return new CardImportResult
                 {
@@ -174,8 +185,8 @@ public class CardImportService : ICardImportService
                 };
             }
 
-            // Upload image to blob storage (need to reopen stream)
-            imageStream.Position = 0;
+            // Read and upload image file
+            await using var imageStream = File.OpenRead(imageFile);
             var imageUrl = await _imageService.UploadCardImageAsync(
                 imageStream,
                 packName,
@@ -186,12 +197,11 @@ public class CardImportService : ICardImportService
             if (dryRun)
             {
                 _logger.LogInformation(
-                    "[DRY RUN] Would import: {Name} ({Type}, {Alignment}, {Arena}) - Confidence: {Confidence:P0}",
-                    analysis.Name,
-                    analysis.Type,
-                    analysis.Alignment,
-                    analysis.Arena,
-                    analysis.Confidence
+                    "[DRY RUN] Would import: {Name} ({Type}, {Alignment}, {Arena})",
+                    mapping.Name,
+                    mapping.Type,
+                    mapping.Alignment,
+                    mapping.Arena
                 );
 
                 return new CardImportResult
@@ -203,12 +213,12 @@ public class CardImportService : ICardImportService
                     SkipReason = "Dry run - no database changes",
                     ImportedCard = new Card
                     {
-                        Name = analysis.Name,
-                        Type = analysis.Type,
-                        Alignment = analysis.Alignment,
-                        Arena = analysis.Arena,
-                        Version = analysis.Version,
-                        CardText = analysis.CardText,
+                        Name = mapping.Name,
+                        Type = mapping.Type,
+                        Alignment = mapping.Alignment,
+                        Arena = mapping.Arena,
+                        Version = mapping.Version,
+                        CardText = mapping.CardText,
                         ImageUrl = imageUrl,
                     },
                 };
@@ -217,12 +227,12 @@ public class CardImportService : ICardImportService
             // Create and save card
             var card = new Card
             {
-                Name = analysis.Name,
-                Type = analysis.Type,
-                Alignment = analysis.Alignment,
-                Arena = analysis.Arena,
-                Version = analysis.Version,
-                CardText = analysis.CardText,
+                Name = mapping.Name,
+                Type = mapping.Type,
+                Alignment = mapping.Alignment,
+                Arena = mapping.Arena,
+                Version = mapping.Version,
+                CardText = mapping.CardText,
                 ImageUrl = imageUrl,
             };
 

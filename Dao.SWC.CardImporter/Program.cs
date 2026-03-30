@@ -1,10 +1,8 @@
-using Azure.AI.OpenAI;
 using Dao.SWC.Core;
 using Dao.SWC.Core.CardImport;
 using Dao.SWC.Services.CardImport;
 using Dao.SWC.Services.Data;
 using Microsoft.Extensions.Options;
-using System.ClientModel;
 
 // Parse command line arguments
 var packFilter = GetArgValue(args, "--pack", "-p");
@@ -30,32 +28,13 @@ builder.AddNpgsqlDbContext<SwcDbContext>(Constants.ProjectNames.Database);
 // Add Azure Blob Storage from Aspire
 builder.AddAzureBlobServiceClient(Constants.ProjectNames.BlobContainer);
 
-builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
-
-// Add Azure OpenAI client from IOptions configuration
-builder.Services.Configure<AzureOpenAiOptions>(
-    builder.Configuration.GetSection(AzureOpenAiOptions.SectionName)
-);
-
-builder.Services.AddSingleton(sp =>
-{
-    var options = sp.GetRequiredService<IOptions<AzureOpenAiOptions>>().Value;
-
-    if (string.IsNullOrEmpty(options.Endpoint))
-        throw new InvalidOperationException("AzureOpenAi:Endpoint is not configured");
-    if (string.IsNullOrEmpty(options.Key))
-        throw new InvalidOperationException("AzureOpenAi:Key is not configured");
-
-    return new AzureOpenAIClient(new Uri(options.Endpoint), new ApiKeyCredential(options.Key));
-});
-
 // Configure import options from appsettings
 builder.Services.Configure<CardImportOptions>(
     builder.Configuration.GetSection(CardImportOptions.SectionName)
 );
 
 // Register services
-builder.Services.AddScoped<ICardAnalysisService, CardAnalysisService>();
+builder.Services.AddScoped<ICsvCardMappingService, CsvCardMappingService>();
 builder.Services.AddScoped<ICardImageService, CardImageService>();
 builder.Services.AddScoped<ICardImportService, CardImportService>();
 
@@ -203,13 +182,14 @@ static void PrintHelp()
         """
         Star Wars TCG Card Importer
 
-        Imports card images into the database using AI analysis.
+        Imports card images into the database using CSV mapping files.
+        Each pack folder should contain a 'cards.csv' with card metadata.
 
         Usage: Dao.SWC.CardImporter [options]
 
         Options:
           -p, --pack <name>     Filter to import only a specific pack (partial match)
-          -d, --dry-run         Analyze cards without persisting to database
+          -d, --dry-run         Process cards without persisting to database
           --delay <ms>          Delay between cards in milliseconds (default: 500)
           -v, --verbose         Enable verbose output
           -h, --help            Show this help message
@@ -217,7 +197,7 @@ static void PrintHelp()
         Examples:
           Dao.SWC.CardImporter --dry-run --verbose
           Dao.SWC.CardImporter --pack "Attack of the Clones"
-          Dao.SWC.CardImporter --delay 1000 --verbose
+          Dao.SWC.CardImporter --delay 100 --verbose
         """
     );
 }
