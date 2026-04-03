@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Dao.SWC.ApiService.Extensions;
 using Dao.SWC.ApiService.Hubs;
 using Dao.SWC.Core;
@@ -17,9 +18,23 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
-if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString(Constants.ProjectNames.KeyVault)))
+if (
+    !string.IsNullOrEmpty(
+        builder.Configuration.GetConnectionString(Constants.ProjectNames.KeyVault)
+    )
+)
 {
-    builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
+    var managedIdentityClientId = builder.Configuration["AZURE_CLIENT_ID"];
+    builder.Configuration.AddAzureKeyVaultSecrets(
+        connectionName: Constants.ProjectNames.KeyVault,
+        configureSettings: settings =>
+        {
+            if (!string.IsNullOrEmpty(managedIdentityClientId))
+            {
+                settings.Credential = new ManagedIdentityCredential(managedIdentityClientId);
+            }
+        }
+    );
 }
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
