@@ -1,9 +1,10 @@
-using System.Diagnostics;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Entities;
 using Dao.SWC.Services.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using System.Diagnostics;
 
 namespace Dao.SWC.MigrationService;
 
@@ -28,9 +29,10 @@ public class DbMigrationWorker(
         {
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<SwcDbContext>();
+            var options = scope.ServiceProvider.GetRequiredService<IOptions<MigrationOptions>>().Value;
 
             await RunMigrationAsync(dbContext, cancellationToken);
-            await SeedRolesAsync(scope.ServiceProvider, cancellationToken);
+            await SeedRolesAsync(scope.ServiceProvider, options);
 
             Logger.LogInformation("Database migration and seeding completed successfully");
         }
@@ -61,7 +63,7 @@ public class DbMigrationWorker(
 
     private static async Task SeedRolesAsync(
         IServiceProvider serviceProvider,
-        CancellationToken cancellationToken
+        MigrationOptions options
     )
     {
         var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
@@ -78,11 +80,13 @@ public class DbMigrationWorker(
         }
 
         // Assign admin role to seed user
-        const string adminEmail = "dao.olvera@gmail.com";
-        var adminUser = await userManager.FindByEmailAsync(adminEmail);
-        if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, Constants.Roles.Admin))
+        foreach (string adminEmail in options.AdminEmails)
         {
-            await userManager.AddToRoleAsync(adminUser, Constants.Roles.Admin);
+            var adminUser = await userManager.FindByEmailAsync(adminEmail);
+            if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, Constants.Roles.Admin))
+            {
+                await userManager.AddToRoleAsync(adminUser, Constants.Roles.Admin);
+            }
         }
     }
 }

@@ -65,15 +65,11 @@ var webApp = builder
     .WithReference(apiService)
     .WaitFor(apiService)
     .WithHttpEndpoint(targetPort: 3000, env: "PORT")
-    .WithEnvironment(
-        Constants.WebAppConfiguration.ApiUrlEnvironmentKey,
-        apiService.GetEndpoint("https")
-    )
     .WithExternalHttpEndpoints()
     .PublishAsDockerFile()
     .WithHttpHealthCheck("/health");
 
-if (!string.IsNullOrWhiteSpace(builder.Configuration[Constants.AppUrlConfigurationKey]))
+if (builder.ExecutionContext.IsPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration[Constants.AppUrlConfigurationKey]))
 {
     apiService.WithEnvironment(
         Constants.AppUrlConfigurationKey,
@@ -84,6 +80,21 @@ else
 {
     var frontendHttpEndpoint = webApp.GetEndpoint("http");
     apiService.WithEnvironment(Constants.AppUrlConfigurationKey, frontendHttpEndpoint);
+}
+
+if (builder.ExecutionContext.IsPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration[Constants.ApiUrlConfigurationKey]))
+{
+    webApp.WithEnvironment(
+        Constants.WebAppConfiguration.ApiUrlEnvironmentKey,
+        builder.Configuration[Constants.ApiUrlConfigurationKey]
+    );
+}
+else
+{
+    webApp.WithEnvironment(
+        Constants.WebAppConfiguration.ApiUrlEnvironmentKey,
+        apiService.GetEndpoint("https")
+    );
 }
 
 builder.Build().Run();

@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Identity;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
+builder.Services.AddOptions<MigrationOptions>()
+    .Bind(builder.Configuration.GetSection(MigrationOptions.SectionName))
+    .ValidateOnStart();
+
 builder.Services.AddHostedService<DbMigrationWorker>();
 
 builder
