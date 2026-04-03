@@ -12,9 +12,9 @@
     <ProjectReference Include="..\Dao.SWC.Services\Dao.SWC.Services.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Aspire.Azure.Security.KeyVault" Version="13.2.0" />
-    <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.2.0" />
-    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.2.0" />
+    <PackageReference Include="Aspire.Azure.Security.KeyVault" Version="13.2.1" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.2.1" />
+    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.2.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
   </ItemGroup>
   <ItemGroup>
