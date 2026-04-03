@@ -27,7 +27,7 @@ Built with .NET Aspire for orchestration:
 
 ## Getting Started
 
-1. Ensure you have .NET 8 SDK and Node.js installed
+1. Ensure you have .NET 10 SDK and Node.js installed
 2. Run the AppHost project:
    ```
    dotnet run --project Dao.SWC.AppHost
