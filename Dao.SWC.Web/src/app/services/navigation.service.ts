@@ -23,6 +23,27 @@ export class NavigationService {
       requiresAuth: true,
       requiresRole: 'CardEditor',
     },
+    {
+      label: 'Resources',
+      icon: 'file-earmark-pdf',
+      children: [
+        {
+          label: 'Revenge of the Sith Rulebook',
+          externalUrl: '/assets/docs/WOTC Revenge of the Sith Rulebook.pdf',
+          icon: 'book',
+        },
+        {
+          label: '2005 WOTC Errata & FAQ',
+          externalUrl: '/assets/docs/2005_WOTC_Eratta_Rulings_FAQ.pdf',
+          icon: 'file-text',
+        },
+        {
+          label: 'Errata and Rulings',
+          externalUrl: '/assets/docs/Errata and Rulings.pdf',
+          icon: 'file-text',
+        },
+      ],
+    },
   ];
 
   private sidebarOpenSubject = new BehaviorSubject<boolean>(false);

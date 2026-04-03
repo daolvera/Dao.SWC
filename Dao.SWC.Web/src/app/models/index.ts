@@ -24,7 +24,8 @@ export interface INotification {
  */
 export interface INavigationItem {
   label: string;
-  route: string;
+  route?: string;
+  externalUrl?: string;
   icon?: string;
   requiresAuth?: boolean;
   requiresRole?: string;

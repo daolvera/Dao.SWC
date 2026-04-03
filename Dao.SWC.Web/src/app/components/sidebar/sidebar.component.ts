@@ -16,6 +16,8 @@ export class SidebarComponent {
   public navigationService = inject(NavigationService);
   public authService = inject(AuthService);
 
+  private expandedItems = new Set<string>();
+
   /** Filtered navigation items based on authentication and role state */
   navigationItems = computed(() => {
     const isAuthenticated = this.authService.isAuthenticated();
@@ -25,6 +27,18 @@ export class SidebarComponent {
       return true;
     });
   });
+
+  toggleExpanded(label: string): void {
+    if (this.expandedItems.has(label)) {
+      this.expandedItems.delete(label);
+    } else {
+      this.expandedItems.add(label);
+    }
+  }
+
+  isExpanded(label: string): boolean {
+    return this.expandedItems.has(label);
+  }
 
   closeSidebar(): void {
     this.navigationService.closeSidebar();

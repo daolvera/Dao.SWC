@@ -14,21 +14,76 @@
 
   <nav class="sidebar-nav">
     <ul class="nav flex-column">
-      @for (item of navigationItems(); track item.route) {
-        <li class="nav-item">
-          <a
-            class="nav-link"
-            [routerLink]="item.route"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: item.route === '/' }"
-            (click)="closeSidebar()"
-          >
-            @if (item.icon) {
-              <i class="bi bi-{{ item.icon }} me-2"></i>
+      @for (item of navigationItems(); track item.label) {
+        @if (item.children) {
+          <!-- Collapsible section for items with children -->
+          <li class="nav-item">
+            <a
+              class="nav-link d-flex justify-content-between align-items-center"
+              (click)="toggleExpanded(item.label)"
+              role="button"
+            >
+              <span>
+                @if (item.icon) {
+                  <i class="bi bi-{{ item.icon }} me-2"></i>
+                }
+                {{ item.label }}
+              </span>
+              <i class="bi" [class.bi-chevron-down]="!isExpanded(item.label)" [class.bi-chevron-up]="isExpanded(item.label)"></i>
+            </a>
+            @if (isExpanded(item.label)) {
+              <ul class="nav flex-column ms-3">
+                @for (child of item.children; track child.label) {
+                  <li class="nav-item">
+                    @if (child.externalUrl) {
+                      <a
+                        class="nav-link"
+                        [href]="child.externalUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        (click)="closeSidebar()"
+                      >
+                        @if (child.icon) {
+                          <i class="bi bi-{{ child.icon }} me-2"></i>
+                        }
+                        {{ child.label }}
+                        <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                      </a>
+                    } @else {
+                      <a
+                        class="nav-link"
+                        [routerLink]="child.route"
+                        routerLinkActive="active"
+                        (click)="closeSidebar()"
+                      >
+                        @if (child.icon) {
+                          <i class="bi bi-{{ child.icon }} me-2"></i>
+                        }
+                        {{ child.label }}
+                      </a>
+                    }
+                  </li>
+                }
+              </ul>
             }
-            {{ item.label }}
-          </a>
-        </li>
+          </li>
+        } @else {
+          <!-- Regular nav item -->
+          <li class="nav-item">
+            <a
+              class="nav-link"
+              [routerLink]="item.route"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: item.route === '/' }"
+              (click)="closeSidebar()"
+            >
+              @if (item.icon) {
+                <i class="bi bi-{{ item.icon }} me-2"></i>
+              }
+              {{ item.label }}
+            </a>
+          </li>
+        }
       }
     </ul>
   </nav>

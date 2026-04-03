@@ -19,18 +19,65 @@
       <!-- Desktop Navigation -->
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
-          @for (item of navigationService.navigationItems; track item.route) {
+          @for (item of navigationService.navigationItems; track item.label) {
             @if (shouldShowNavItem(item)) {
-              <li class="nav-item">
-                <a
-                  class="nav-link"
-                  [routerLink]="item.route"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="{ exact: item.route === '/' }"
-                >
-                  {{ item.label }}
-                </a>
-              </li>
+              @if (item.children) {
+                <!-- Dropdown for items with children -->
+                <li class="nav-item dropdown" ngbDropdown>
+                  <a
+                    class="nav-link dropdown-toggle"
+                    ngbDropdownToggle
+                    role="button"
+                  >
+                    @if (item.icon) {
+                      <i class="bi bi-{{ item.icon }} me-1"></i>
+                    }
+                    {{ item.label }}
+                  </a>
+                  <ul class="dropdown-menu" ngbDropdownMenu>
+                    @for (child of item.children; track child.label) {
+                      <li>
+                        @if (child.externalUrl) {
+                          <a
+                            class="dropdown-item"
+                            [href]="child.externalUrl"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            @if (child.icon) {
+                              <i class="bi bi-{{ child.icon }} me-2"></i>
+                            }
+                            {{ child.label }}
+                          </a>
+                        } @else {
+                          <a
+                            class="dropdown-item"
+                            [routerLink]="child.route"
+                            routerLinkActive="active"
+                          >
+                            @if (child.icon) {
+                              <i class="bi bi-{{ child.icon }} me-2"></i>
+                            }
+                            {{ child.label }}
+                          </a>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </li>
+              } @else {
+                <!-- Regular nav item -->
+                <li class="nav-item">
+                  <a
+                    class="nav-link"
+                    [routerLink]="item.route"
+                    routerLinkActive="active"
+                    [routerLinkActiveOptions]="{ exact: item.route === '/' }"
+                  >
+                    {{ item.label }}
+                  </a>
+                </li>
+              }
             }
           }
           @if (authService.isAuthenticated()) {
