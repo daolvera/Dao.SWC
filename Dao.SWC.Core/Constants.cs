@@ -1,4 +1,4 @@
-﻿namespace Dao.SWC.Core;
+namespace Dao.SWC.Core;
 
 public static class Constants
 {
@@ -26,7 +26,7 @@ public static class Constants
         public const string AppInsights = "swcai";
         public const string WebApp = "swcapp";
         public const string Database = "swcdb";
-        public const string DatabaseProvider = "swcdbprovider";
+        public const string DatabaseProvider = "swcpostgres";
         public const string MigrationService = "swcmigrationservice";
         public const string BlobStorage = "swcstorage";
         public const string BlobContainer = "swcblobs";
