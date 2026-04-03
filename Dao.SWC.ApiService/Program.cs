@@ -16,7 +16,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
-builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
+
+if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString(Constants.ProjectNames.KeyVault)))
+{
+    builder.Configuration.AddAzureKeyVaultSecrets(connectionName: Constants.ProjectNames.KeyVault);
+}
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

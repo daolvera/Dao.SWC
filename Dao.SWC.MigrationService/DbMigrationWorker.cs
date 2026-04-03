@@ -9,7 +9,8 @@ namespace Dao.SWC.MigrationService;
 
 public class DbMigrationWorker(
     IServiceProvider ServiceProvider,
-    IHostApplicationLifetime HostApplicationLifetime
+    IHostApplicationLifetime HostApplicationLifetime,
+    ILogger<DbMigrationWorker> Logger
 ) : BackgroundService
 {
     private static readonly ActivitySource s_activitySource = new(
@@ -30,14 +31,19 @@ public class DbMigrationWorker(
 
             await RunMigrationAsync(dbContext, cancellationToken);
             await SeedRolesAsync(scope.ServiceProvider, cancellationToken);
+
+            Logger.LogInformation("Database migration and seeding completed successfully");
         }
         catch (Exception ex)
         {
             activity?.AddException(ex);
-            throw;
+            Logger.LogError(ex, "An error occurred while migrating the database");
+            Environment.ExitCode = 1;
         }
-
-        HostApplicationLifetime.StopApplication();
+        finally
+        {
+            HostApplicationLifetime.StopApplication();
+        }
     }
 
     private static async Task RunMigrationAsync(

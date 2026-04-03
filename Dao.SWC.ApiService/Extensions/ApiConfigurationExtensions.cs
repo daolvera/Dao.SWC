@@ -1,4 +1,3 @@
-﻿using System.Threading.RateLimiting;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
 using Dao.SWC.Core.Entities;
@@ -9,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using System.Threading.RateLimiting;
 
 namespace Dao.SWC.ApiService.Extensions;
 
@@ -195,10 +195,10 @@ public static class ApiConfigurationExtensions
                 .AddGoogle(options =>
                 {
                     options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                    options.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
+                    options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? throw new InvalidDataException("Google Client ID is required");
                     options.ClientSecret = builder.Configuration[
                         "Authentication:Google:ClientSecret"
-                    ]!;
+                    ] ?? throw new InvalidDataException("Google Client Secret is not configured");
                     options.CallbackPath = "/Auth/google/callback";
                 });
 
