@@ -19,7 +19,7 @@ Built with .NET Aspire for orchestration:
 
 ## Tech Stack
 
-- .NET 8 / ASP.NET Core
+- .NET 10 / ASP.NET Core
 - Angular
 - PostgreSQL
 - Azure Blob Storage (card images)
