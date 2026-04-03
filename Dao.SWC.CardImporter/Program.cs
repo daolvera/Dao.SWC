@@ -23,7 +23,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 
 // Add database context from Aspire
-builder.AddNpgsqlDbContext<SwcDbContext>(Constants.ProjectNames.Database);
+builder.AddSqlServerDbContext<SwcDbContext>(Constants.ProjectNames.Database);
 
 // Add Azure Blob Storage from Aspire
 builder.AddAzureBlobServiceClient(Constants.ProjectNames.BlobContainer);

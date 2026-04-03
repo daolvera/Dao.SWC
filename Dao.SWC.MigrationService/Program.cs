@@ -12,7 +12,7 @@ builder
     .Services.AddOpenTelemetry()
     .WithTracing(tracing => tracing.AddSource(Constants.ProjectNames.MigrationService));
 
-builder.AddNpgsqlDbContext<SwcDbContext>(Constants.ProjectNames.Database);
+builder.AddSqlServerDbContext<SwcDbContext>(Constants.ProjectNames.Database);
 
 // Add Identity services for seeding roles
 builder

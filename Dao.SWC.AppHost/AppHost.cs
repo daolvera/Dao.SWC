@@ -2,23 +2,21 @@ using Dao.SWC.Core;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Use Azure PostgreSQL Flexible Server in production, containerized for local dev
+// Use Azure SQL Database in production, containerized SQL Server for local dev
 IResourceBuilder<IResourceWithConnectionString> swcDb;
 
 if (builder.ExecutionContext.IsPublishMode)
 {
-    var azurePostgres = builder.AddAzurePostgresFlexibleServer(
-        Constants.ProjectNames.DatabaseProvider
-    );
-    swcDb = azurePostgres.AddDatabase(Constants.ProjectNames.Database);
+    var azureSql = builder.AddAzureSqlServer(Constants.ProjectNames.DatabaseProvider);
+    swcDb = azureSql.AddDatabase(Constants.ProjectNames.Database);
 }
 else
 {
-    var postgres = builder
-        .AddPostgres(Constants.ProjectNames.DatabaseProvider)
+    var sqlServer = builder
+        .AddSqlServer(Constants.ProjectNames.DatabaseProvider)
         .WithDataVolume()
         .WithLifetime(ContainerLifetime.Persistent);
-    swcDb = postgres.AddDatabase(Constants.ProjectNames.Database);
+    swcDb = sqlServer.AddDatabase(Constants.ProjectNames.Database);
 }
 
 var blobStorage = builder.AddAzureStorage(Constants.ProjectNames.BlobStorage);

@@ -90,8 +90,8 @@ public class SwcDbContextFactory : IDesignTimeDbContextFactory<SwcDbContext>
 
         // This connection string is only used for migrations tooling.
         // At runtime, Aspire provides the real connection string.
-        optionsBuilder.UseNpgsql(
-            "Host=localhost;Database=breakpointdb;Username=postgres;Password=postgres"
+        optionsBuilder.UseSqlServer(
+            "Server=localhost;Database=breakpointdb;User Id=sa;Password=P@ssw0rd1;TrustServerCertificate=true"
         );
 
         return new SwcDbContext(optionsBuilder.Options);

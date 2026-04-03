@@ -70,7 +70,7 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.AddNpgsqlDbContext<SwcDbContext>(Constants.ProjectNames.Database);
+builder.AddSqlServerDbContext<SwcDbContext>(Constants.ProjectNames.Database);
 
 builder.AddAzureBlobServiceClient(Constants.ProjectNames.BlobContainer);
 
