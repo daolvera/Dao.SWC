@@ -4,11 +4,10 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var keyVault = builder.AddAzureKeyVault(Constants.ProjectNames.KeyVault);
 
-var postgres = builder.AddAzurePostgresFlexibleServer("postgres")
-                    .RunAsContainer(container =>
-                    {
-                        container.WithDataVolume();
-                    });
+var postgres = builder
+    .AddPostgres(Constants.ProjectNames.DatabaseProvider)
+    .WithDataVolume()
+    .WithLifetime(ContainerLifetime.Persistent);
 
 var insights = builder.AddAzureApplicationInsights(Constants.ProjectNames.AppInsights);
 
@@ -32,13 +31,13 @@ var cardImporter = builder
     .WithReference(blobs)
     .WithReference(keyVault)
     .WithReference(insights)
-    .WaitFor(migrations)
+    .WaitForCompletion(migrations)
     .WithExplicitStart();
 
 var apiService = builder
     .AddProject<Projects.Dao_SWC_ApiService>(Constants.ProjectNames.ApiService)
     .WithExternalHttpEndpoints() // Required for OAuth callbacks
-    .WaitFor(migrations)
+    .WaitForCompletion(migrations)
     .WithReference(swcDb)
     .WithReference(blobs)
     .WithReference(insights)
