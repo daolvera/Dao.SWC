@@ -1,10 +1,10 @@
-using System.Text.RegularExpressions;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
 using Dao.SWC.Core;
 using Dao.SWC.Core.CardImport;
 using Microsoft.Extensions.Logging;
+using System.Text.RegularExpressions;
 
 namespace Dao.SWC.Services.CardImport;
 
@@ -68,6 +68,10 @@ public partial class CardImageService : ICardImageService
         if (string.IsNullOrEmpty(blobUrl))
         {
             return string.Empty;
+        }
+        if (blobUrl.Contains("http://127.0.0.1") || blobUrl.Contains("localhost"))
+        {
+            return blobUrl;
         }
 
         var expiry = expiresIn ?? TimeSpan.FromHours(1);

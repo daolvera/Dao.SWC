@@ -2,9 +2,11 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { Alignment } from '../models/dtos/card.dto';
 import {
   CreateDeckDto,
   DeckDto,
+  DeckImportResult,
   DeckListItemDto,
   DeckValidationResult,
   UpdateDeckDto,
@@ -44,5 +46,21 @@ export class DeckService {
 
   validateDeck(id: number): Observable<DeckValidationResult> {
     return this.http.get<DeckValidationResult>(`${this.baseUrl}/${id}/validate`);
+  }
+
+  importDeck(file: File, deckName: string, alignment: Alignment): Observable<DeckImportResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('deckName', deckName);
+    formData.append('alignment', alignment.toString());
+    return this.http.post<DeckImportResult>(`${this.baseUrl}/import`, formData);
+  }
+
+  getTemplateUrl(): string {
+    return `${this.baseUrl}/template`;
+  }
+
+  getExportUrl(deckId: number): string {
+    return `${this.baseUrl}/${deckId}/export`;
   }
 }

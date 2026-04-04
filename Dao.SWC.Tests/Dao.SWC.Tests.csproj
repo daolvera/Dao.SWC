@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Dao.SWC.AppHost\Dao.SWC.AppHost.csproj" />
+    <ProjectReference Include="..\Dao.SWC.Services\Dao.SWC.Services.csproj" />
   </ItemGroup>
 
   <ItemGroup>

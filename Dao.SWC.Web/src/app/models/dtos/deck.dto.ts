@@ -47,3 +47,28 @@ export interface DeckValidationResult {
   errors: string[];
   warnings: string[];
 }
+
+export interface CsvDeckCardEntry {
+  quantity: number;
+  cardName: string;
+  version: string | null;
+}
+
+export interface CardMatchResult {
+  entry: CsvDeckCardEntry;
+  cardId: number | null;
+  cardName: string | null;
+  isMatched: boolean;
+  skipReason: string | null;
+}
+
+export interface DeckImportResult {
+  success: boolean;
+  message: string;
+  createdDeck: DeckDto | null;
+  validationResult: DeckValidationResult | null;
+  matchedCards: CardMatchResult[];
+  skippedCards: CardMatchResult[];
+  totalEntriesParsed: number;
+  totalCardsImported: number;
+}

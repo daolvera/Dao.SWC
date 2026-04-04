@@ -6,9 +6,11 @@ using Dao.SWC.Core.Authentication;
 using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Decks;
 using Dao.SWC.Core.GameRoom;
+using Dao.SWC.Core.DeckImport;
 using Dao.SWC.Services.Authentication;
 using Dao.SWC.Services.CardImport;
 using Dao.SWC.Services.Data;
+using Dao.SWC.Services.DeckImport;
 using Dao.SWC.Services.Decks;
 using Dao.SWC.Services.GameRoom;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -68,6 +70,11 @@ builder.Services.AddScoped<IDeckService, DeckService>();
 builder.Services.AddScoped<IDeckValidationService, DeckValidationService>();
 builder.Services.AddScoped<ICardService, CardService>();
 builder.Services.AddScoped<ICardImageService, CardImageService>();
+
+// Deck import services
+builder.Services.AddScoped<ICsvDeckParsingService, CsvDeckParsingService>();
+builder.Services.AddScoped<ICardMatchingService, CardMatchingService>();
+builder.Services.AddScoped<IDeckImportService, DeckImportService>();
 
 // Configure authentication
 builder.AddGoogleAuthentication();

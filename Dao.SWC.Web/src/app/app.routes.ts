@@ -21,6 +21,12 @@ export const routes: Routes = [
       import('./pages/decks/create-deck.component').then((m) => m.CreateDeckComponent),
   },
   {
+    path: 'decks/import',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pages/decks/import-deck.component').then((m) => m.ImportDeckComponent),
+  },
+  {
     path: 'decks/:id/edit',
     canActivate: [authGuard],
     loadComponent: () =>

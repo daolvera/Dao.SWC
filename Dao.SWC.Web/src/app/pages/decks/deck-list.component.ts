@@ -11,9 +11,14 @@ import { DeckService } from '../../services/deck.service';
     <div class="container py-4">
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>My Decks</h1>
-        <a routerLink="/decks/new" class="btn btn-primary">
-          <i class="bi bi-plus-lg me-2"></i>Create Deck
-        </a>
+        <div class="d-flex gap-2">
+          <a routerLink="/decks/import" class="btn btn-outline-primary">
+            <i class="bi bi-upload me-2"></i>Import CSV
+          </a>
+          <a routerLink="/decks/new" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-2"></i>Create Deck
+          </a>
+        </div>
       </div>
 
       @if (loading()) {
@@ -60,6 +65,13 @@ import { DeckService } from '../../services/deck.service';
                   <div class="btn-group w-100">
                     <a [routerLink]="['/decks', deck.id, 'edit']" class="btn btn-outline-primary">
                       Edit
+                    </a>
+                    <a
+                      [href]="getExportUrl(deck.id)"
+                      class="btn btn-outline-secondary"
+                      download
+                    >
+                      Export
                     </a>
                     <button type="button" class="btn btn-outline-danger" (click)="deleteDeck(deck)">
                       Delete
@@ -110,6 +122,10 @@ export class DeckListComponent implements OnInit {
       case Alignment.Neutral:
         return 'Neutral';
     }
+  }
+
+  getExportUrl(deckId: number): string {
+    return this.deckService.getExportUrl(deckId);
   }
 
   deleteDeck(deck: DeckListItemDto): void {
