@@ -103,6 +103,7 @@ interface EditableCard extends CardDto {
           <thead class="table-light sticky-top">
             <tr>
               <th style="width: 50px;">ID</th>
+              <th style="width: 60px;">Image</th>
               <th style="width: 180px;">Name</th>
               <th style="width: 100px;">Type</th>
               <th style="width: 100px;">Alignment</th>
@@ -117,6 +118,19 @@ interface EditableCard extends CardDto {
             @for (card of cards(); track card.id) {
               <tr [class.table-warning]="card.isDirty">
                 <td class="align-middle text-center">{{ card.id }}</td>
+                <td class="align-middle text-center">
+                  @if (card.imageUrl) {
+                    <img
+                      [src]="card.imageUrl"
+                      [alt]="card.name"
+                      class="card-thumbnail"
+                      (click)="openZoom(card)"
+                      (error)="onImageError($event)"
+                    />
+                  } @else {
+                    <span class="text-muted">-</span>
+                  }
+                </td>
                 <td>
                   <input
                     type="text"
@@ -224,6 +238,19 @@ interface EditableCard extends CardDto {
 
     <!-- Card Create Modal -->
     <app-card-create-modal (cardCreated)="onCardCreated($event)" />
+
+    <!-- Zoom Modal -->
+    @if (zoomCard()) {
+      <div class="zoom-overlay" (click)="closeZoom()">
+        <div class="zoom-content" (click)="$event.stopPropagation()">
+          <img [src]="zoomCard()!.imageUrl" [alt]="zoomCard()!.name" />
+          <div class="zoom-card-name">{{ zoomCard()!.name }}</div>
+          <button class="btn btn-light btn-sm zoom-close" (click)="closeZoom()">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </div>
+    }
   `,
   styles: [
     `
@@ -233,6 +260,58 @@ interface EditableCard extends CardDto {
       }
       textarea {
         font-size: 0.875rem;
+      }
+      .card-thumbnail {
+        width: 40px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      }
+      .card-thumbnail:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      .zoom-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        cursor: pointer;
+        backdrop-filter: blur(5px);
+      }
+      .zoom-content {
+        position: relative;
+        cursor: default;
+      }
+      .zoom-content img {
+        max-width: 90vw;
+        max-height: 85vh;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      }
+      .zoom-card-name {
+        text-align: center;
+        color: white;
+        font-size: 1.25rem;
+        margin-top: 1rem;
+        font-weight: 500;
+      }
+      .zoom-close {
+        position: absolute;
+        top: -12px;
+        right: -12px;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
     `,
   ],
@@ -253,6 +332,7 @@ export class CardManagementComponent implements OnInit {
   saving = signal(false);
   seeding = signal(false);
   currentFilter: CardFilter = {};
+  zoomCard = signal<EditableCard | null>(null);
 
   // Pagination
   pageSize = 100;
@@ -390,5 +470,20 @@ export class CardManagementComponent implements OnInit {
         this.updateDirtyState();
       },
     });
+  }
+
+  openZoom(card: EditableCard): void {
+    if (card.imageUrl) {
+      this.zoomCard.set(card);
+    }
+  }
+
+  closeZoom(): void {
+    this.zoomCard.set(null);
+  }
+
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    img.style.display = 'none';
   }
 }

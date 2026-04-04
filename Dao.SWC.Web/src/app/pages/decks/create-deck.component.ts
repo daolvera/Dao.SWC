@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Alignment } from '../../models/dtos/card.dto';
+import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
 import { DeckService } from '../../services/deck.service';
 
 @Component({
@@ -102,7 +103,7 @@ import { DeckService } from '../../services/deck.service';
   `,
   imports: [ReactiveFormsModule],
 })
-export class CreateDeckComponent {
+export class CreateDeckComponent implements HasUnsavedChanges {
   protected readonly Alignment = Alignment;
 
   private fb = inject(FormBuilder);
@@ -110,16 +111,29 @@ export class CreateDeckComponent {
   private router = inject(Router);
 
   saving = signal(false);
+  private submitted = false;
 
   form = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(100)]],
     alignment: [Alignment.Light, Validators.required],
   });
 
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) {
+      event.preventDefault();
+    }
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.form.dirty && !this.submitted;
+  }
+
   onSubmit(): void {
     if (this.form.invalid) return;
 
     this.saving.set(true);
+    this.submitted = true;
 
     const { name, alignment } = this.form.value;
     this.deckService.createDeck({ name: name!, alignment: alignment! }).subscribe({
@@ -128,6 +142,7 @@ export class CreateDeckComponent {
       },
       error: () => {
         this.saving.set(false);
+        this.submitted = false;
       },
     });
   }

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  HostListener,
   inject,
   OnInit,
   signal,
@@ -15,6 +16,7 @@ import { CardService } from '../../services/card.service';
 import { DeckService } from '../../services/deck.service';
 import { CardFilter } from '../../models/filters/card-filter';
 import { CardFiltersComponent } from '../../components/card-filters/card-filters.component';
+import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
 
 interface DeckCardEntry {
   card: CardDto;
@@ -426,7 +428,7 @@ type DeckFilter = { kind: 'type'; value: CardType } | { kind: 'arena'; value: Ar
   `,
   imports: [RouterLink, NgbPagination, CardFiltersComponent],
 })
-export class DeckBuilderComponent implements OnInit {
+export class DeckBuilderComponent implements OnInit, HasUnsavedChanges {
   protected readonly CardType = CardType;
   protected readonly Arena = Arena;
 
@@ -442,6 +444,7 @@ export class DeckBuilderComponent implements OnInit {
   deckCards = signal<DeckCardEntry[]>([]);
   availableCards = signal<CardDto[]>([]);
   saving = signal(false);
+  private savedDeckState = '';
 
   // Rename state
   editingName = signal(false);
@@ -579,6 +582,7 @@ export class DeckBuilderComponent implements OnInit {
           quantity: dc.quantity,
         }));
         this.deckCards.set(entries);
+        this.savedDeckState = this.serializeDeckState(entries);
         // Load cards after deck is loaded (for alignment filter)
         this.loadCards();
       },
@@ -659,6 +663,7 @@ export class DeckBuilderComponent implements OnInit {
 
     this.deckService.updateDeck(deck.id, updateDto).subscribe({
       next: () => {
+        this.savedDeckState = this.serializeDeckState(this.deckCards());
         this.saving.set(false);
       },
       error: () => {
@@ -824,5 +829,25 @@ export class DeckBuilderComponent implements OnInit {
 
   clearDeckFilter(): void {
     this.deckFilter.set(null);
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) {
+      event.preventDefault();
+    }
+  }
+
+  hasUnsavedChanges(): boolean {
+    const currentState = this.serializeDeckState(this.deckCards());
+    return currentState !== this.savedDeckState;
+  }
+
+  private serializeDeckState(entries: DeckCardEntry[]): string {
+    const sorted = [...entries]
+      .map((e) => `${e.card.id}:${e.quantity}`)
+      .sort()
+      .join(',');
+    return sorted;
   }
 }
