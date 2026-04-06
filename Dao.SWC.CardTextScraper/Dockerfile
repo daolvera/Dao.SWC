@@ -22,7 +22,7 @@ RUN dotnet publish Dao.SWC.CardTextScraper/Dao.SWC.CardTextScraper.csproj \
 # Install Playwright Chromium browser binaries (SDK image has pwsh)
 RUN pwsh /app/publish/playwright.ps1 install chromium
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 # Install Chromium runtime OS dependencies
