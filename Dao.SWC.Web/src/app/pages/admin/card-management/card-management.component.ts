@@ -47,9 +47,9 @@ interface EditableCard extends CardDto {
           <a
             routerLink="/admin/card-text-fill"
             class="btn btn-outline-info"
-            title="Auto-fill card text from swtcg.com"
+            title="View and edit cards missing text"
           >
-            <i class="bi bi-cloud-download me-1"></i>Auto-Fill Text
+            <i class="bi bi-pencil-square me-1"></i>Cards Missing Text
           </a>
           <button
             class="btn btn-outline-secondary"

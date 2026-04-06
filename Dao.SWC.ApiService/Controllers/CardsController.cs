@@ -23,11 +23,12 @@ public class CardsController(ICardService cardService, ICardImageService imageSe
         [FromQuery] CardType? type = null,
         [FromQuery] Alignment? alignment = null,
         [FromQuery] Arena? arena = null,
+        [FromQuery] bool missingCardText = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50
     )
     {
-        var filter = new CardFilterVm(search, searchByName, type, alignment, arena, page, pageSize);
+        var filter = new CardFilterVm(search, searchByName, type, alignment, arena, missingCardText, page, pageSize);
         var result = await cardService.GetCardsPagedAsync(filter);
         return Ok(result);
     }

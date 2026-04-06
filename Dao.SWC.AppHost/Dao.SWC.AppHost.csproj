@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Dao.SWC.ApiService\Dao.SWC.ApiService.csproj" />
     <ProjectReference Include="..\Dao.SWC.CardImporter\Dao.SWC.CardImporter.csproj" />
+    <ProjectReference Include="..\Dao.SWC.CardTextScraper\Dao.SWC.CardTextScraper.csproj" />
     <ProjectReference Include="..\Dao.SWC.Core\Dao.SWC.Core.csproj">
       <IsAspireProjectResource>false</IsAspireProjectResource>
     </ProjectReference>

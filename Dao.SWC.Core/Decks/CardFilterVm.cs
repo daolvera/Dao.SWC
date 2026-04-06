@@ -6,6 +6,7 @@ public record CardFilterVm(
     Enums.CardType? Type = null,
     Enums.Alignment? Alignment = null,
     Enums.Arena? Arena = null,
+    bool MissingCardText = false,
     int Page = 1,
     int PageSize = 50
 );

@@ -32,6 +32,7 @@ public static class Constants
         public const string BlobStorage = "swcstorage";
         public const string BlobContainer = "swcblobs";
         public const string CardImporter = "swccardimporter";
+        public const string CardTextScraper = "swccardtextscraper";
         public const string OpenAi = "swcopenai";
     }
 

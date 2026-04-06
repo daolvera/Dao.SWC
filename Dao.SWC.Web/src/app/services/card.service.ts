@@ -33,6 +33,9 @@ export class CardService {
       if (filter.arena !== undefined) {
         params = params.set('arena', filter.arena.toString());
       }
+      if (filter.missingCardText !== undefined) {
+        params = params.set('missingCardText', filter.missingCardText.toString());
+      }
       if (filter.page !== undefined) {
         params = params.set('page', filter.page.toString());
       }

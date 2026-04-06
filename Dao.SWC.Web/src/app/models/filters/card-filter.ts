@@ -6,6 +6,7 @@ export interface CardFilter {
   type?: CardType;
   alignment?: Alignment;
   arena?: Arena;
+  missingCardText?: boolean;
   page?: number;
   pageSize?: number;
 }
