@@ -20,13 +20,28 @@ public record GameRoomDto(
     string RoomCode,
     RoomType RoomType,
     GameState State,
-    IEnumerable<GamePlayerDto> Players
+    IEnumerable<GamePlayerDto> Players,
+    IEnumerable<TeamDataDto>? Teams,
+    bool BidsRevealed
+);
+
+public record TeamDataDto(
+    Team Team,
+    int Force,
+    int BuildCounter,
+    Dictionary<string, IEnumerable<CardInstanceDto>> Arenas,
+    IEnumerable<CardInstanceDto> BuildZone,
+    bool SpaceArenaRetreated,
+    bool GroundArenaRetreated,
+    bool CharacterArenaRetreated,
+    int? SecretBid
 );
 
 public record GamePlayerDto(
     string Username,
     string DeckName,
     Enums.Alignment Alignment,
+    Team Team,
     bool IsHost,
     bool IsConnected,
     int Force,
@@ -39,7 +54,8 @@ public record GamePlayerDto(
     IEnumerable<CardInstanceDto> BuildZone,
     bool SpaceArenaRetreated,
     bool GroundArenaRetreated,
-    bool CharacterArenaRetreated
+    bool CharacterArenaRetreated,
+    int? SecretBid
 );
 
 public record CardInstanceDto(
@@ -56,7 +72,15 @@ public record CardInstanceDto(
     int? Counter,
     int? Damage,
     string? StackParentId,
-    IEnumerable<string> StackedUnderIds
+    IEnumerable<string> StackedUnderIds,
+    string? OwnerUserId,
+    // Piloting
+    bool IsPilot,
+    IEnumerable<string> PilotCardIds,
+    string? PilotingUnitId,
+    // Equipment
+    string? EquipmentCardId,
+    string? EquippedToUnitId
 );
 
 public record DiceRolledEvent(string Username, int[] Results);
@@ -120,9 +144,34 @@ public record StackResultDto(
     CardInstanceDto? TopCard
 );
 
+// Pilot operation result DTOs
+public record PilotResultDto(
+    bool Success,
+    string? ErrorMessage,
+    CardInstanceDto? PilotCard,
+    CardInstanceDto? UnitCard
+);
+
+// Equipment operation result DTOs
+public record EquipmentResultDto(
+    bool Success,
+    string? ErrorMessage,
+    CardInstanceDto? EquipmentCard,
+    CardInstanceDto? UnitCard
+);
+
 public record PlayCardResultDto(
     bool Success,
     string? ErrorMessage,
     CardInstanceDto? Card,
     bool WasAutoStacked
 );
+
+// Bidding DTOs
+public record BidSubmittedEvent(Team Team, int Bid, string SubmittedBy);
+
+public record BidsRevealedEvent(IEnumerable<TeamBidDto> Bids);
+
+public record BidsHiddenEvent();
+
+public record TeamBidDto(Team Team, int? Bid, string? PlayerName);

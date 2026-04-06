@@ -25,6 +25,7 @@ export interface CardDto {
   alignment: Alignment;
   arena: Arena | null;
   version: string | null;
+  isPilot: boolean;
   imageUrl: string | null;
   cardText: string | null;
 }
@@ -36,6 +37,7 @@ export interface CardUpdateDto {
   alignment: Alignment;
   arena: Arena | null;
   version: string | null;
+  isPilot: boolean;
   imageUrl: string | null;
   cardText: string | null;
 }
@@ -46,5 +48,6 @@ export interface CardCreateDto {
   alignment: Alignment;
   arena: Arena | null;
   version: string | null;
+  isPilot: boolean;
   cardText: string | null;
 }

@@ -98,6 +98,9 @@ public class CsvCardMappingService : ICsvCardMappingService
             ? null
             : ParseEnum<Arena>(dto.Arena, Arena.Character);
 
+        // Parse IsPilot boolean
+        var isPilot = ParseBool(dto.IsPilot);
+
         return new CsvCardMapping
         {
             FileName = dto.FileName.Trim(),
@@ -106,6 +109,7 @@ public class CsvCardMappingService : ICsvCardMappingService
             Alignment = alignment,
             Arena = arena,
             Version = string.IsNullOrWhiteSpace(dto.Version) ? null : dto.Version.Trim(),
+            IsPilot = isPilot,
             CardText = string.IsNullOrWhiteSpace(dto.CardText) ? null : dto.CardText.Trim(),
         };
     }
@@ -122,6 +126,17 @@ public class CsvCardMappingService : ICsvCardMappingService
             : defaultValue;
     }
 
+    private static bool ParseBool(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim().ToLowerInvariant();
+        return trimmed == "true" || trimmed == "1" || trimmed == "yes";
+    }
+
     /// <summary>
     /// Internal DTO for CSV parsing (allows string properties for flexible parsing).
     /// </summary>
@@ -133,6 +148,7 @@ public class CsvCardMappingService : ICsvCardMappingService
         public string? Alignment { get; set; }
         public string? Arena { get; set; }
         public string? Version { get; set; }
+        public string? IsPilot { get; set; }
         public string? CardText { get; set; }
     }
 }

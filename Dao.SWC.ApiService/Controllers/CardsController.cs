@@ -91,6 +91,7 @@ public class CardsController(ICardService cardService, ICardImageService imageSe
             form.Alignment,
             form.Arena,
             form.Version,
+            form.IsPilot,
             imageUrl,
             form.CardText
         );
@@ -206,6 +207,7 @@ public class CardCreateFormDto
     public Alignment Alignment { get; set; }
     public Arena? Arena { get; set; }
     public string? Version { get; set; }
+    public bool IsPilot { get; set; }
     public string? CardText { get; set; }
     public IFormFile? Image { get; set; }
 }

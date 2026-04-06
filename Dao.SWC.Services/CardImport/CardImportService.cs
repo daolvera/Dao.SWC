@@ -218,6 +218,7 @@ public class CardImportService : ICardImportService
                         Alignment = mapping.Alignment,
                         Arena = mapping.Arena,
                         Version = mapping.Version,
+                        IsPilot = mapping.IsPilot,
                         CardText = mapping.CardText,
                         ImageUrl = imageUrl,
                     },
@@ -232,6 +233,7 @@ public class CardImportService : ICardImportService
                 Alignment = mapping.Alignment,
                 Arena = mapping.Arena,
                 Version = mapping.Version,
+                IsPilot = mapping.IsPilot,
                 CardText = mapping.CardText,
                 ImageUrl = imageUrl,
             };

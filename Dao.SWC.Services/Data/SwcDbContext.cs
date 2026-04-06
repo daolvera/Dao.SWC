@@ -49,7 +49,7 @@ public class SwcDbContext : IdentityDbContext<AppUser>
 
             entity
                 .HasOne(d => d.User)
-                .WithMany()
+                .WithMany(u => u.Decks)
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 

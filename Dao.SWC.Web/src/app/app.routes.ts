@@ -57,6 +57,12 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'admin/users',
+    canActivate: [authGuard, roleGuard('Admin')],
+    loadComponent: () =>
+      import('./pages/admin/user-stats/user-stats.component').then((m) => m.UserStatsComponent),
+  },
+  {
     path: '**',
     loadComponent: () =>
       import('./pages/not-found/not-found.component').then((m) => m.NotFoundComponent),

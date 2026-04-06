@@ -38,6 +38,11 @@ public record CsvCardMapping
     public string? Version { get; init; }
 
     /// <summary>
+    /// Whether this is a pilot character card.
+    /// </summary>
+    public bool IsPilot { get; init; }
+
+    /// <summary>
     /// The rules text on the card.
     /// </summary>
     public string? CardText { get; init; }

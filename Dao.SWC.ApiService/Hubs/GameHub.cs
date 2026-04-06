@@ -712,6 +712,30 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     }
 
     /// <summary>
+    /// Toggle retreat state of an individual card in play.
+    /// </summary>
+    public async Task ToggleCardRetreat(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var card = await gameRoomService.ToggleCardRetreatAsync(roomCode, userId, instanceGuid);
+        if (card != null)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+        }
+    }
+
+    /// <summary>
     /// Move a card from build zone to play area.
     /// </summary>
     public async Task<PlayCardResultDto> MoveFromBuild(string cardInstanceId, string arena)
@@ -791,27 +815,78 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
 
     private static GameRoomDto MapToGameRoomDto(Core.GameRoom.GameRoom room, string viewingUserId)
     {
+        var viewingPlayer = room.GetPlayer(viewingUserId);
         return new GameRoomDto(
             room.RoomCode,
             room.RoomType,
             room.State,
-            room.Players.Select(p => MapToPlayerDto(p, p.UserId == viewingUserId, room.HostUserId))
+            room.Players.Select(p => MapToPlayerDto(p, p.UserId == viewingUserId, room.HostUserId, room, viewingPlayer)),
+            room.IsTeamMode ? room.Teams.Values.Select(t => MapToTeamDto(t, room, viewingPlayer)) : null,
+            room.BidsRevealed
         );
     }
 
-    private static GamePlayerDto MapToPlayerDto(GamePlayer player, bool isMe, string hostUserId)
+    private static TeamDataDto MapToTeamDto(TeamData team, Core.GameRoom.GameRoom room, GamePlayer? viewingPlayer)
     {
+        // Aggregate cards from all players on this team
+        var teamPlayers = room.GetPlayersOnTeam(team.Team).ToList();
+        var allTeamCards = teamPlayers.SelectMany(p => p.Cards).ToList();
+
+        var spaceArenaCards = allTeamCards.Where(c => c.Zone == Core.GameRoom.CardZone.PlayArea && c.Arena == "space").Select(MapToCardInstanceDto);
+        var groundArenaCards = allTeamCards.Where(c => c.Zone == Core.GameRoom.CardZone.PlayArea && c.Arena == "ground").Select(MapToCardInstanceDto);
+        var characterArenaCards = allTeamCards.Where(c => c.Zone == Core.GameRoom.CardZone.PlayArea && c.Arena == "character").Select(MapToCardInstanceDto);
+        var buildZoneCards = allTeamCards.Where(c => c.Zone == Core.GameRoom.CardZone.BuildZone).Select(MapToCardInstanceDto);
+
+        // Show bid only if revealed OR viewing user is on this team
+        var canSeeBid = room.BidsRevealed || (viewingPlayer != null && viewingPlayer.Team == team.Team);
+        var bidToShow = canSeeBid ? team.SecretBid : null;
+
+        return new TeamDataDto(
+            team.Team,
+            team.Force,
+            team.BuildCounter,
+            new Dictionary<string, IEnumerable<CardInstanceDto>>
+            {
+                ["space"] = spaceArenaCards,
+                ["ground"] = groundArenaCards,
+                ["character"] = characterArenaCards,
+            },
+            buildZoneCards,
+            team.SpaceArenaRetreated,
+            team.GroundArenaRetreated,
+            team.CharacterArenaRetreated,
+            bidToShow
+        );
+    }
+
+    private static GamePlayerDto MapToPlayerDto(GamePlayer player, bool isMe, string hostUserId, Core.GameRoom.GameRoom room, GamePlayer? viewingPlayer)
+    {
+        // In team mode, arenas/build/force/build counter come from team data
+        // In 1v1, they come from player data
+        var teamData = room.GetPlayerTeam(player.UserId);
+        var isTeamMode = room.IsTeamMode;
+
+        // For 1v1 mode, show bid only if revealed OR viewing user is this player
+        int? bidToShow = null;
+        if (!isTeamMode)
+        {
+            var canSeeBid = room.BidsRevealed || isMe;
+            bidToShow = canSeeBid ? player.SecretBid : null;
+        }
+
         return new GamePlayerDto(
             player.DisplayName,
             player.DeckName,
             player.EffectiveAlignment,
+            player.Team,
             player.UserId == hostUserId,
             player.IsConnected,
-            player.Force,
-            player.BuildCounter,
+            isTeamMode && teamData != null ? teamData.Force : player.Force,
+            isTeamMode && teamData != null ? teamData.BuildCounter : player.BuildCounter,
             isMe ? player.Hand.Select(MapToCardInstanceDto) : [],
             player.Hand.Count(),
             player.Deck.Count(),
+            isTeamMode ? new Dictionary<string, IEnumerable<CardInstanceDto>>() :
             new Dictionary<string, IEnumerable<CardInstanceDto>>
             {
                 ["space"] = player.SpaceArena.Select(MapToCardInstanceDto),
@@ -819,10 +894,11 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
                 ["character"] = player.CharacterArena.Select(MapToCardInstanceDto),
             },
             player.DiscardPile.Select(MapToCardInstanceDto),
-            player.BuildArea.Select(MapToCardInstanceDto),
-            player.SpaceArenaRetreated,
-            player.GroundArenaRetreated,
-            player.CharacterArenaRetreated
+            isTeamMode ? [] : player.BuildArea.Select(MapToCardInstanceDto),
+            isTeamMode && teamData != null ? teamData.SpaceArenaRetreated : player.SpaceArenaRetreated,
+            isTeamMode && teamData != null ? teamData.GroundArenaRetreated : player.GroundArenaRetreated,
+            isTeamMode && teamData != null ? teamData.CharacterArenaRetreated : player.CharacterArenaRetreated,
+            bidToShow
         );
     }
 
@@ -845,7 +921,15 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             card.Counter,
             card.Damage,
             card.StackParentId?.ToString(),
-            card.StackedUnderIds.Select(id => id.ToString())
+            card.StackedUnderIds.Select(id => id.ToString()),
+            card.OwnerUserId,
+            // Piloting
+            card.IsPilot,
+            card.PilotCardIds.Select(id => id.ToString()),
+            card.PilotingUnitId?.ToString(),
+            // Equipment
+            card.EquipmentCardId?.ToString(),
+            card.EquippedToUnitId?.ToString()
         );
     }
 
@@ -976,6 +1060,216 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
 
     #endregion
 
+    #region Piloting
+
+    /// <summary>
+    /// Add a pilot to a unit in space or ground arena.
+    /// </summary>
+    public async Task<PilotResultDto> AddPilot(string pilotCardId, string targetUnitId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return new PilotResultDto(false, "Not connected to a room", null, null);
+        }
+
+        if (
+            !Guid.TryParse(pilotCardId, out var pilotGuid)
+            || !Guid.TryParse(targetUnitId, out var unitGuid)
+        )
+        {
+            return new PilotResultDto(false, "Invalid card ID format", null, null);
+        }
+
+        var result = await gameRoomService.AddPilotAsync(roomCode, userId, pilotGuid, unitGuid);
+
+        if (result.Success)
+        {
+            // Notify all players in the room
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new PilotResultDto(
+                true,
+                null,
+                result.PilotCard != null ? MapToCardInstanceDto(result.PilotCard) : null,
+                result.UnitCard != null ? MapToCardInstanceDto(result.UnitCard) : null
+            );
+        }
+
+        return new PilotResultDto(false, result.ErrorMessage, null, null);
+    }
+
+    /// <summary>
+    /// Remove a pilot from a unit.
+    /// </summary>
+    public async Task<PilotResultDto> RemovePilot(string pilotCardId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return new PilotResultDto(false, "Not connected to a room", null, null);
+        }
+
+        if (!Guid.TryParse(pilotCardId, out var pilotGuid))
+        {
+            return new PilotResultDto(false, "Invalid card ID format", null, null);
+        }
+
+        var result = await gameRoomService.RemovePilotAsync(roomCode, userId, pilotGuid);
+
+        if (result.Success)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new PilotResultDto(
+                true,
+                null,
+                result.PilotCard != null ? MapToCardInstanceDto(result.PilotCard) : null,
+                result.UnitCard != null ? MapToCardInstanceDto(result.UnitCard) : null
+            );
+        }
+
+        return new PilotResultDto(false, result.ErrorMessage, null, null);
+    }
+
+    /// <summary>
+    /// Get units that can be piloted by a given pilot card.
+    /// </summary>
+    public Task<IEnumerable<CardInstanceDto>> GetPilotableUnits(string pilotCardId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return Task.FromResult<IEnumerable<CardInstanceDto>>([]);
+        }
+
+        if (!Guid.TryParse(pilotCardId, out var pilotGuid))
+        {
+            return Task.FromResult<IEnumerable<CardInstanceDto>>([]);
+        }
+
+        var units = gameRoomService.GetPilotableUnits(roomCode, userId, pilotGuid);
+        return Task.FromResult(units.Select(MapToCardInstanceDto));
+    }
+
+    #endregion
+
+    #region Equipment
+
+    /// <summary>
+    /// Add equipment to a unit.
+    /// </summary>
+    public async Task<EquipmentResultDto> AddEquipment(string equipmentCardId, string targetUnitId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return new EquipmentResultDto(false, "Not connected to a room", null, null);
+        }
+
+        if (
+            !Guid.TryParse(equipmentCardId, out var equipmentGuid)
+            || !Guid.TryParse(targetUnitId, out var unitGuid)
+        )
+        {
+            return new EquipmentResultDto(false, "Invalid card ID format", null, null);
+        }
+
+        var result = await gameRoomService.AddEquipmentAsync(
+            roomCode,
+            userId,
+            equipmentGuid,
+            unitGuid
+        );
+
+        if (result.Success)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new EquipmentResultDto(
+                true,
+                null,
+                result.EquipmentCard != null ? MapToCardInstanceDto(result.EquipmentCard) : null,
+                result.UnitCard != null ? MapToCardInstanceDto(result.UnitCard) : null
+            );
+        }
+
+        return new EquipmentResultDto(false, result.ErrorMessage, null, null);
+    }
+
+    /// <summary>
+    /// Remove equipment from a unit.
+    /// </summary>
+    public async Task<EquipmentResultDto> RemoveEquipment(string equipmentCardId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return new EquipmentResultDto(false, "Not connected to a room", null, null);
+        }
+
+        if (!Guid.TryParse(equipmentCardId, out var equipmentGuid))
+        {
+            return new EquipmentResultDto(false, "Invalid card ID format", null, null);
+        }
+
+        var result = await gameRoomService.RemoveEquipmentAsync(roomCode, userId, equipmentGuid);
+
+        if (result.Success)
+        {
+            var room = gameRoomService.GetRoom(roomCode);
+            if (room != null)
+            {
+                await SendRoomUpdateToGroupAsync(room);
+            }
+            return new EquipmentResultDto(
+                true,
+                null,
+                result.EquipmentCard != null ? MapToCardInstanceDto(result.EquipmentCard) : null,
+                result.UnitCard != null ? MapToCardInstanceDto(result.UnitCard) : null
+            );
+        }
+
+        return new EquipmentResultDto(false, result.ErrorMessage, null, null);
+    }
+
+    /// <summary>
+    /// Get units that can have a given equipment card equipped.
+    /// </summary>
+    public Task<IEnumerable<CardInstanceDto>> GetEquippableUnits(string equipmentCardId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+        {
+            return Task.FromResult<IEnumerable<CardInstanceDto>>([]);
+        }
+
+        if (!Guid.TryParse(equipmentCardId, out var equipmentGuid))
+        {
+            return Task.FromResult<IEnumerable<CardInstanceDto>>([]);
+        }
+
+        var units = gameRoomService.GetEquippableUnits(roomCode, userId, equipmentGuid);
+        return Task.FromResult(units.Select(MapToCardInstanceDto));
+    }
+
+    #endregion
+
     #region Chat
 
     /// <summary>
@@ -1002,6 +1296,214 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
         await Clients
             .Group(GetRoomGroup(roomCode))
             .SendAsync("ChatMessageReceived", displayName, message);
+    }
+
+    #endregion
+
+    #region Bidding
+
+    /// <summary>
+    /// Submit or update a secret bid for the current team/player.
+    /// </summary>
+    public async Task SubmitBid(int bid)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        var displayName = Context.User?.FindFirstValue(ClaimTypes.Email);
+
+        if (userId == null || roomCode == null || string.IsNullOrEmpty(displayName))
+        {
+            await Clients.Caller.SendAsync("Error", "Not in a room");
+            return;
+        }
+
+        if (bid <= 0)
+        {
+            await Clients.Caller.SendAsync("Error", "Bid must be a positive number");
+            return;
+        }
+
+        var room = gameRoomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Room not found");
+            return;
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Player not in room");
+            return;
+        }
+
+        if (room.IsTeamMode)
+        {
+            // Team mode: store bid in team data
+            var teamData = room.GetTeam(player.Team);
+            if (teamData != null)
+            {
+                teamData.SecretBid = bid;
+            }
+        }
+        else
+        {
+            // 1v1 mode: store bid in player data
+            player.SecretBid = bid;
+        }
+
+        // Notify teammates of bid update
+        await BroadcastToTeammates(room, player);
+
+        logger.LogInformation(
+            "Bid submitted in room {RoomCode} by {DisplayName}: {Bid}",
+            roomCode,
+            displayName,
+            bid
+        );
+    }
+
+    /// <summary>
+    /// Reveal all bids to all players (host only).
+    /// </summary>
+    public async Task RevealBids()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+
+        if (userId == null || roomCode == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Not in a room");
+            return;
+        }
+
+        var room = gameRoomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Room not found");
+            return;
+        }
+
+        if (!room.IsHost(userId))
+        {
+            await Clients.Caller.SendAsync("Error", "Only the host can reveal bids");
+            return;
+        }
+
+        room.BidsRevealed = true;
+
+        // Broadcast full room state update to all players
+        await SendRoomUpdateToGroupAsync(room);
+
+        logger.LogInformation("Bids revealed in room {RoomCode} by host", roomCode);
+    }
+
+    /// <summary>
+    /// Hide all bids (host only).
+    /// </summary>
+    public async Task HideBids()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+
+        if (userId == null || roomCode == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Not in a room");
+            return;
+        }
+
+        var room = gameRoomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Room not found");
+            return;
+        }
+
+        if (!room.IsHost(userId))
+        {
+            await Clients.Caller.SendAsync("Error", "Only the host can hide bids");
+            return;
+        }
+
+        room.BidsRevealed = false;
+
+        // Broadcast full room state update to all players
+        await SendRoomUpdateToGroupAsync(room);
+
+        logger.LogInformation("Bids hidden in room {RoomCode} by host", roomCode);
+    }
+
+    /// <summary>
+    /// Clear the current team/player bid.
+    /// </summary>
+    public async Task ClearBid()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+
+        if (userId == null || roomCode == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Not in a room");
+            return;
+        }
+
+        var room = gameRoomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Room not found");
+            return;
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            await Clients.Caller.SendAsync("Error", "Player not in room");
+            return;
+        }
+
+        if (room.IsTeamMode)
+        {
+            var teamData = room.GetTeam(player.Team);
+            if (teamData != null)
+            {
+                teamData.SecretBid = null;
+            }
+        }
+        else
+        {
+            player.SecretBid = null;
+        }
+
+        // Notify teammates of bid update
+        await BroadcastToTeammates(room, player);
+
+        logger.LogInformation("Bid cleared in room {RoomCode} by {UserId}", roomCode, userId);
+    }
+
+    private async Task BroadcastToTeammates(Core.GameRoom.GameRoom room, GamePlayer player)
+    {
+        if (room.IsTeamMode)
+        {
+            // Notify all teammates
+            var teammates = room.GetPlayersOnTeam(player.Team);
+            foreach (var teammate in teammates)
+            {
+                if (teammate.ConnectionId != null)
+                {
+                    var dto = MapToGameRoomDto(room, teammate.UserId);
+                    await Clients.Client(teammate.ConnectionId).SendAsync("RoomUpdated", dto);
+                }
+            }
+        }
+        else
+        {
+            // 1v1: just notify the player
+            if (player.ConnectionId != null)
+            {
+                var dto = MapToGameRoomDto(room, player.UserId);
+                await Clients.Client(player.ConnectionId).SendAsync("RoomUpdated", dto);
+            }
+        }
     }
 
     #endregion

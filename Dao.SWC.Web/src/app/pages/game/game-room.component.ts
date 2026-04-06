@@ -22,6 +22,8 @@ import {
   GameRoomDto,
   GameState,
   RoomType,
+  Team,
+  TeamDataDto,
 } from '../../models/dtos/game.dto';
 import { Alignment } from '../../models/dtos/card.dto';
 import { GameHubService } from '../../services/game-hub.service';
@@ -37,6 +39,8 @@ interface DraggedCard {
 
 // CardType enum values
 const CARD_TYPE_UNIT = 0;
+const CARD_TYPE_EQUIPMENT = 2;
+const CARD_TYPE_BATTLE = 4;
 
 @Component({
   selector: 'app-game-room',
@@ -73,10 +77,20 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   bottomControlsCollapsed = signal(false);
   zoomCard = signal<CardInstanceDto | null>(null);
 
+  // Arena card order state (for client-side reordering)
+  arenaCardOrder = signal<{ [arena: string]: string[] }>({
+    space: [],
+    ground: [],
+    character: [],
+  });
+
   // Chat state
   chatMessages = signal<ChatMessage[]>([]);
   chatInput = new FormControl('');
   @ViewChild('chatMessagesContainer') chatMessagesContainer!: ElementRef<HTMLElement>;
+
+  // Bidding state
+  bidInput = new FormControl<number | null>(null, [Validators.min(1)]);
   
   // Computed: check if zoomed card should be displayed sideways (non-unit cards)
   isZoomCardSideways = computed(() => {
@@ -95,15 +109,17 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   cardMenuCard = computed(() => {
     const cardId = this.cardMenuCardId();
     if (!cardId) return null;
-    const me = this.myPlayer();
-    if (!me) return null;
-    // Search all arenas and play areas
-    for (const arena of Object.values(me.arenas)) {
-      const card = arena.find((c) => c.instanceId === cardId);
-      if (card) return card;
+    // Search arenas (team-aware)
+    const arenas = this.isTeamMode() ? this.myTeamArenas() : this.myPlayer()?.arenas;
+    if (arenas) {
+      for (const arena of Object.values(arenas)) {
+        const card = arena.find((c) => c.instanceId === cardId);
+        if (card) return card;
+      }
     }
     // Also search discard pile
-    const discardCard = me.discardPile.find((c) => c.instanceId === cardId);
+    const me = this.myPlayer();
+    const discardCard = me?.discardPile.find((c) => c.instanceId === cardId);
     if (discardCard) return discardCard;
     return null;
   });
@@ -124,17 +140,67 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   stackMenuCard = computed(() => {
     const cardId = this.stackMenuCardId();
     if (!cardId) return null;
-    const me = this.myPlayer();
-    if (!me) return null;
-    for (const arena of Object.values(me.arenas)) {
-      const card = arena.find((c) => c.instanceId === cardId);
-      if (card) return card;
+    // Search arenas (team-aware)
+    const arenas = this.isTeamMode() ? this.myTeamArenas() : this.myPlayer()?.arenas;
+    if (arenas) {
+      for (const arena of Object.values(arenas)) {
+        const card = arena.find((c) => c.instanceId === cardId);
+        if (card) return card;
+      }
     }
     return null;
   });
 
   // Stackable cards for hand card
   stackableTargets = signal<CardInstanceDto[]>([]);
+
+  // Pilot context menu state
+  pilotMenuCardId = signal<string | null>(null);
+  pilotMenuUnitCard = signal<CardInstanceDto | null>(null);
+  pilotMenuX = signal(0);
+  pilotMenuY = signal(0);
+
+  pilotMenuCard = computed(() => {
+    const cardId = this.pilotMenuCardId();
+    if (!cardId) return null;
+    // Search arenas (team-aware)
+    const arenas = this.isTeamMode() ? this.myTeamArenas() : this.myPlayer()?.arenas;
+    if (arenas) {
+      for (const arena of Object.values(arenas)) {
+        const card = arena.find((c) => c.instanceId === cardId);
+        if (card) return card;
+      }
+    }
+    return null;
+  });
+
+  // Pilot modal state
+  showPilotModal = signal(false);
+  pilotModalCard = signal<CardInstanceDto | null>(null);
+
+  // Equipment context menu state
+  equipmentMenuCardId = signal<string | null>(null);
+  equipmentMenuUnitCard = signal<CardInstanceDto | null>(null);
+  equipmentMenuX = signal(0);
+  equipmentMenuY = signal(0);
+
+  equipmentMenuCard = computed(() => {
+    const cardId = this.equipmentMenuCardId();
+    if (!cardId) return null;
+    // Search arenas (team-aware)
+    const arenas = this.isTeamMode() ? this.myTeamArenas() : this.myPlayer()?.arenas;
+    if (arenas) {
+      for (const arena of Object.values(arenas)) {
+        const card = arena.find((c) => c.instanceId === cardId);
+        if (card) return card;
+      }
+    }
+    return null;
+  });
+
+  // Equipment modal state
+  showEquipmentModal = signal(false);
+  equipmentModalCard = signal<CardInstanceDto | null>(null);
 
   private draggedCard: DraggedCard | null = null;
   private subscriptions: Subscription[] = [];
@@ -158,6 +224,136 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     if (!r) return [];
     return r.players.filter((p) => p.username !== this.gameHub.currentUser);
   });
+
+  // Team mode computed signals
+  isTeamMode = computed(() => {
+    const r = this.room();
+    return r !== null && r.roomType !== RoomType.OneVOne;
+  });
+
+  myTeam = computed((): TeamDataDto | null => {
+    const r = this.room();
+    const me = this.myPlayer();
+    if (!r || !me || !r.teams) return null;
+    return r.teams.find((t) => t.team === me.team) ?? null;
+  });
+
+  opponentTeam = computed((): TeamDataDto | null => {
+    const r = this.room();
+    const me = this.myPlayer();
+    if (!r || !me || !r.teams) return null;
+    return r.teams.find((t) => t.team !== me.team) ?? null;
+  });
+
+  teammates = computed(() => {
+    const r = this.room();
+    const me = this.myPlayer();
+    if (!r || !me) return [];
+    return r.players.filter((p) => p.team === me.team && p.username !== this.gameHub.currentUser);
+  });
+
+  opponentTeamPlayers = computed(() => {
+    const r = this.room();
+    const me = this.myPlayer();
+    if (!r || !me) return [];
+    return r.players.filter((p) => p.team !== me.team);
+  });
+
+  // Team arena cards (for team mode)
+  myTeamArenas = computed((): { [arena: string]: CardInstanceDto[] } => {
+    const team = this.myTeam();
+    if (!team) return { space: [], ground: [], character: [] };
+    return team.arenas;
+  });
+
+  myTeamBuildZone = computed(() => {
+    const team = this.myTeam();
+    return team?.buildZone ?? [];
+  });
+
+  myTeamForce = computed(() => {
+    const team = this.myTeam();
+    const me = this.myPlayer();
+    // In team mode use team force, otherwise use player force
+    if (this.isTeamMode() && team) return team.force;
+    return me?.force ?? 4;
+  });
+
+  myTeamBuildCounter = computed(() => {
+    const team = this.myTeam();
+    const me = this.myPlayer();
+    // In team mode use team build counter, otherwise use player build counter
+    if (this.isTeamMode() && team) return team.buildCounter;
+    return me?.buildCounter ?? 60;
+  });
+
+  opponentTeamArenas = computed((): { [arena: string]: CardInstanceDto[] } => {
+    const team = this.opponentTeam();
+    if (!team) return { space: [], ground: [], character: [] };
+    return team.arenas;
+  });
+
+  opponentTeamBuildZone = computed(() => {
+    const team = this.opponentTeam();
+    return team?.buildZone ?? [];
+  });
+
+  // Bidding computed properties
+  myBid = computed(() => {
+    const r = this.room();
+    if (!r) return null;
+
+    if (this.isTeamMode()) {
+      // Team mode: get bid from my team
+      return this.myTeam()?.secretBid ?? null;
+    } else {
+      // 1v1 mode: get bid from my player
+      return this.myPlayer()?.secretBid ?? null;
+    }
+  });
+
+  bidsRevealed = computed(() => {
+    return this.room()?.bidsRevealed ?? false;
+  });
+
+  allBids = computed(() => {
+    const r = this.room();
+    if (!r) return [];
+
+    if (this.isTeamMode()) {
+      // Team mode: return team bids
+      return (
+        r.teams?.map((t) => ({
+          team: t.team,
+          label: t.team === Team.Team1 ? 'Team 1' : 'Team 2',
+          bid: t.secretBid,
+        })) ?? []
+      );
+    } else {
+      // 1v1 mode: return player bids
+      return r.players.map((p) => ({
+        team: p.team,
+        label: p.username,
+        bid: p.secretBid,
+      }));
+    }
+  });
+
+  // Check if opponent team arena is retreated
+  isOpponentTeamArenaRetreated(arena: string): boolean {
+    const team = this.opponentTeam();
+    if (!team) return false;
+    switch (arena) {
+      case 'space':
+        return team.spaceArenaRetreated;
+      case 'ground':
+        return team.groundArenaRetreated;
+      case 'character':
+        return team.characterArenaRetreated;
+      default:
+        return false;
+    }
+  }
 
   maxPlayers = computed(() => {
     const r = this.room();
@@ -249,6 +445,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     return me?.hand ?? [];
   });
 
+  // Hand sorted with sideways cards (non-units) at the end
+  myHandSorted = computed(() => {
+    const hand = this.myHand();
+    // Partition: units first, then non-units (sideways)
+    const units = hand.filter((c) => c.cardType === CARD_TYPE_UNIT);
+    const nonUnits = hand.filter((c) => c.cardType !== CARD_TYPE_UNIT);
+    return [...units, ...nonUnits];
+  });
+
   myDeckSize = computed(() => {
     const me = this.myPlayer();
     return me?.deckSize ?? 0;
@@ -260,12 +465,26 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   });
 
   myBuildZone = computed(() => {
+    // In team mode, use team build zone; otherwise, use player build zone
+    if (this.isTeamMode()) {
+      return this.myTeamBuildZone();
+    }
     const me = this.myPlayer();
     return me?.buildZone ?? [];
   });
 
   showBuildZone = signal(false);
   showOpponentBuildZone = signal<GamePlayerDto | null>(null);
+  showOpponentTeamBuildZone = signal(false);
+
+  // Computed: Get opponent build zone cards (team-aware)
+  opponentBuildZoneCards = computed(() => {
+    if (this.isTeamMode()) {
+      return this.opponentTeamBuildZone();
+    }
+    const opponent = this.showOpponentBuildZone();
+    return opponent?.buildZone ?? [];
+  });
 
   // Build zone card context menu
   buildCardMenuCardId = signal<string | null>(null);
@@ -275,9 +494,8 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   buildCardMenuCard = computed(() => {
     const cardId = this.buildCardMenuCardId();
     if (!cardId) return null;
-    const me = this.myPlayer();
-    if (!me) return null;
-    return me.buildZone.find((c) => c.instanceId === cardId) ?? null;
+    // Use myBuildZone() which handles team mode correctly
+    return this.myBuildZone().find((c) => c.instanceId === cardId) ?? null;
   });
 
   // Discard pile card context menu
@@ -362,10 +580,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Get units (cardType === 0) from a player's arena (only top-level cards, not stacked under)
+  // Get units (cardType === 0) from a player's arena (only top-level cards, not stacked under, not piloting)
   getPlayerArenaUnits(player: GamePlayerDto, arena: string): CardInstanceDto[] {
     const arenaCards = player.arenas[arena] ?? [];
-    return arenaCards.filter((c) => c.cardType === CARD_TYPE_UNIT && !c.stackParentId);
+    return arenaCards.filter((c) => c.cardType === CARD_TYPE_UNIT && !c.stackParentId && !this.isPiloting(c));
   }
 
   // Get non-units from a player's arena
@@ -383,43 +601,93 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       .filter((c): c is CardInstanceDto => c !== undefined);
   }
 
-  // Get my stacked cards
+  // Get my stacked cards (team-aware)
   getMyStackedCards(card: CardInstanceDto): CardInstanceDto[] {
+    // In team mode, search all team arena cards
+    if (this.isTeamMode()) {
+      return this.getMyStackedCardsTeamAware(card);
+    }
     const me = this.myPlayer();
     if (!me) return [];
     return this.getStackedCards(me, card);
   }
 
-  // Get my units for an arena
-  myArenaUnits(arena: string): CardInstanceDto[] {
+  // Get arena cards - team or player based on mode
+  private getMyArenaCards(arena: string): CardInstanceDto[] {
+    if (this.isTeamMode()) {
+      return this.myTeamArenas()[arena] ?? [];
+    }
     const me = this.myPlayer();
-    if (!me) return [];
-    return this.getPlayerArenaUnits(me, arena);
+    return me?.arenas[arena] ?? [];
   }
 
-  // Get my non-units for an arena
+  // Get my units for an arena
+  myArenaUnits(arena: string): CardInstanceDto[] {
+    const arenaCards = this.getMyArenaCards(arena);
+    // Filter out: non-units, stacked cards (pilots are shown as overlays, not filtered)
+    return arenaCards.filter((c) => c.cardType === CARD_TYPE_UNIT && !c.stackParentId && !this.isPiloting(c));
+  }
+
+  // Get my units for an arena with custom ordering
+  myArenaUnitsOrdered(arena: string): CardInstanceDto[] {
+    const units = this.myArenaUnits(arena);
+    const order = this.arenaCardOrder()[arena] || [];
+
+    if (order.length === 0) {
+      return units;
+    }
+
+    // Sort units based on custom order
+    const orderMap = new Map(order.map((id, idx) => [id, idx]));
+    return [...units].sort((a, b) => {
+      const aIdx = orderMap.get(a.instanceId) ?? Number.MAX_SAFE_INTEGER;
+      const bIdx = orderMap.get(b.instanceId) ?? Number.MAX_SAFE_INTEGER;
+      return aIdx - bIdx;
+    });
+  }
+
+  // Get my non-units for an arena (excludes equipment that is currently equipped to a unit)
   myArenaOthers(arena: string): CardInstanceDto[] {
-    const me = this.myPlayer();
-    if (!me) return [];
-    return this.getPlayerArenaOthers(me, arena);
+    const arenaCards = this.getMyArenaCards(arena);
+    return arenaCards.filter((c) => 
+      c.cardType !== CARD_TYPE_UNIT && 
+      !this.isEquipped(c) // Exclude equipped equipment cards
+    );
   }
 
   // Get active (non-retreated) cards from my arena - now based on arena-level retreat
   myArenaActiveUnits(arena: string): CardInstanceDto[] {
-    const me = this.myPlayer();
-    if (!me) return [];
-    if (this.isArenaRetreated(me, arena)) return [];
+    if (this.isMyArenaRetreated(arena)) return [];
     return this.myArenaUnits(arena);
   }
 
   myArenaActiveOthers(arena: string): CardInstanceDto[] {
-    const me = this.myPlayer();
-    if (!me) return [];
-    if (this.isArenaRetreated(me, arena)) return [];
+    if (this.isMyArenaRetreated(arena)) return [];
     return this.myArenaOthers(arena);
   }
 
-  // Check if an arena is retreated
+  // Check if my arena is retreated (team-aware)
+  isMyArenaRetreated(arena: string): boolean {
+    if (this.isTeamMode()) {
+      const team = this.myTeam();
+      if (!team) return false;
+      switch (arena) {
+        case 'space':
+          return team.spaceArenaRetreated;
+        case 'ground':
+          return team.groundArenaRetreated;
+        case 'character':
+          return team.characterArenaRetreated;
+        default:
+          return false;
+      }
+    }
+    const me = this.myPlayer();
+    if (!me) return false;
+    return this.isArenaRetreated(me, arena);
+  }
+
+  // Check if an arena is retreated for a specific player
   isArenaRetreated(player: GamePlayerDto, arena: string): boolean {
     switch (arena) {
       case 'space':
@@ -435,11 +703,46 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   // Get all cards from a retreated arena
   myArenaRetreatedCards(arena: string): CardInstanceDto[] {
-    const me = this.myPlayer();
-    if (!me) return [];
-    if (!this.isArenaRetreated(me, arena)) return [];
-    const arenaCards = me.arenas[arena] ?? [];
-    return arenaCards;
+    if (!this.isMyArenaRetreated(arena)) return [];
+    return this.getMyArenaCards(arena);
+  }
+
+  // Check if current user owns a card (for team mode permission checks)
+  isCardOwner(card: CardInstanceDto): boolean {
+    // In non-team mode, if card is in my player's collection, I own it
+    if (!this.isTeamMode()) return true;
+    // In team mode, check ownerUserId
+    return card.ownerUserId === this.gameHub.currentUser;
+  }
+
+  // Check if current user can perform actions on a card (owner-only except for stacking)
+  canActOnCard(card: CardInstanceDto): boolean {
+    return this.isCardOwner(card);
+  }
+
+  // Get the owner username for display
+  getCardOwnerDisplay(card: CardInstanceDto): string | null {
+    if (!this.isTeamMode() || !card.ownerUserId) return null;
+    const r = this.room();
+    if (!r) return null;
+    const owner = r.players.find((p) => p.username === card.ownerUserId);
+    return owner?.username ?? card.ownerUserId;
+  }
+
+  // Get stacked cards in team mode (searches all team cards)
+  getMyStackedCardsTeamAware(card: CardInstanceDto): CardInstanceDto[] {
+    if (!card.stackedUnderIds || card.stackedUnderIds.length === 0) return [];
+    
+    // Get all cards from my arena (team or player based)
+    const allArenaCards = [
+      ...this.getMyArenaCards('space'),
+      ...this.getMyArenaCards('ground'),
+      ...this.getMyArenaCards('character'),
+    ];
+    
+    return card.stackedUnderIds
+      .map((id) => allArenaCards.find((c) => c.instanceId === id))
+      .filter((c): c is CardInstanceDto => c !== undefined);
   }
 
   // Get retreated cards from opponent's arena
@@ -460,8 +763,76 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     return this.getPlayerArenaOthers(player, arena);
   }
 
+  // Team-based arena access for opponent team
+  getOpponentTeamArenaCards(arena: string): CardInstanceDto[] {
+    return this.opponentTeamArenas()[arena] ?? [];
+  }
+
+  getOpponentTeamArenaUnits(arena: string): CardInstanceDto[] {
+    const arenaCards = this.getOpponentTeamArenaCards(arena);
+    return arenaCards.filter((c) => c.cardType === CARD_TYPE_UNIT && !c.stackParentId);
+  }
+
+  getOpponentTeamArenaOthers(arena: string): CardInstanceDto[] {
+    const arenaCards = this.getOpponentTeamArenaCards(arena);
+    return arenaCards.filter((c) => 
+      c.cardType !== CARD_TYPE_UNIT && 
+      !this.isEquipped(c) // Exclude equipped equipment cards
+    );
+  }
+
+  // Get stacked cards in opponent team arena
+  getOpponentTeamStackedCards(card: CardInstanceDto): CardInstanceDto[] {
+    if (!card.stackedUnderIds || card.stackedUnderIds.length === 0) return [];
+    const allArenaCards = [
+      ...this.getOpponentTeamArenaCards('space'),
+      ...this.getOpponentTeamArenaCards('ground'),
+      ...this.getOpponentTeamArenaCards('character'),
+    ];
+    return card.stackedUnderIds
+      .map((id) => allArenaCards.find((c) => c.instanceId === id))
+      .filter((c): c is CardInstanceDto => c !== undefined);
+  }
+
   getPlayerCardCount(player: GamePlayerDto): number {
     return player.hand.length + player.deckSize;
+  }
+
+  // Arena indicator for build zone cards
+  getArenaIndicatorClass(card: CardInstanceDto): string {
+    // Non-unit cards (Location, Equipment, Mission, Battle) are "sideways" - no specific arena
+    if (card.cardType !== CARD_TYPE_UNIT) {
+      return 'arena-sideways';
+    }
+    // Unit cards have a specific arena
+    switch (card.cardArena?.toLowerCase()) {
+      case 'space':
+        return 'arena-space';
+      case 'ground':
+        return 'arena-ground';
+      case 'character':
+        return 'arena-character';
+      default:
+        return 'arena-unknown';
+    }
+  }
+
+  getArenaIndicatorText(card: CardInstanceDto): string {
+    // Non-unit cards are sideways
+    if (card.cardType !== CARD_TYPE_UNIT) {
+      return 'S';
+    }
+    // Unit cards show arena initial
+    switch (card.cardArena?.toLowerCase()) {
+      case 'space':
+        return 'SP';
+      case 'ground':
+        return 'GR';
+      case 'character':
+        return 'CH';
+      default:
+        return '?';
+    }
   }
 
   selectCard(instanceId: string): void {
@@ -520,12 +891,21 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   // Build zone methods
   async moveToBuild(card: CardInstanceDto): Promise<void> {
+    if (card.cardType === CARD_TYPE_BATTLE) {
+      this.notifications.error('Battle cards cannot be placed in the build zone');
+      return;
+    }
     await this.gameHub.moveToBuild(card.instanceId);
   }
 
   async moveToBuildFromMenu(): Promise<void> {
     const card = this.cardMenuCard();
     if (card) {
+      if (card.cardType === CARD_TYPE_BATTLE) {
+        this.notifications.error('Battle cards cannot be placed in the build zone');
+        this.closeCardMenu();
+        return;
+      }
       await this.gameHub.moveToBuild(card.instanceId);
       this.closeCardMenu();
     }
@@ -534,6 +914,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   async moveToBuildFromHandMenu(): Promise<void> {
     const card = this.handCardMenuCard();
     if (card) {
+      if (card.cardType === CARD_TYPE_BATTLE) {
+        this.notifications.error('Battle cards cannot be placed in the build zone');
+        this.closeHandCardMenu();
+        return;
+      }
       await this.gameHub.moveToBuild(card.instanceId);
       this.closeHandCardMenu();
     }
@@ -542,6 +927,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   // Arena retreat methods
   async toggleArenaRetreat(arena: string): Promise<void> {
     await this.gameHub.toggleArenaRetreat(arena);
+  }
+
+  // Individual card retreat
+  async toggleCardRetreatFromMenu(): Promise<void> {
+    const card = this.cardMenuCard();
+    if (card) {
+      await this.gameHub.toggleCardRetreat(card.instanceId);
+      this.closeCardMenu();
+    }
   }
 
   // Build card context menu methods
@@ -647,6 +1041,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   async onDrop(event: DragEvent, targetZone: CardZone): Promise<void> {
     event.preventDefault();
+    event.stopPropagation();
     this.dragOverZone.set(null);
 
     if (!this.draggedCard) return;
@@ -654,9 +1049,72 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     const { card, sourceZone } = this.draggedCard;
     this.draggedCard = null;
 
+    // If dropping in the same arena, handle reordering
+    if (sourceZone === targetZone && this.isArenaZone(targetZone)) {
+      this.handleArenaReorder(event, card, targetZone);
+      return;
+    }
+
     if (sourceZone === targetZone) return;
 
     await this.moveCard(card.instanceId, sourceZone, targetZone, card);
+  }
+
+  private isArenaZone(zone: CardZone): boolean {
+    return zone === 'space' || zone === 'ground' || zone === 'character';
+  }
+
+  private handleArenaReorder(event: DragEvent, card: CardInstanceDto, arena: CardZone): void {
+    // Get the target card element we're dropping on
+    const target = event.target as HTMLElement;
+    const targetCard = target.closest('.game-card[data-instanceid]');
+    
+    // Get current units in arena
+    const units = this.myArenaUnits(arena);
+    
+    // Initialize order if not set
+    let currentOrder = this.arenaCardOrder()[arena];
+    if (!currentOrder || currentOrder.length === 0) {
+      currentOrder = units.map((c) => c.instanceId);
+    }
+    
+    // Ensure all current units are in the order
+    const unitIds = new Set(units.map((c) => c.instanceId));
+    currentOrder = currentOrder.filter((id) => unitIds.has(id));
+    for (const unit of units) {
+      if (!currentOrder.includes(unit.instanceId)) {
+        currentOrder.push(unit.instanceId);
+      }
+    }
+
+    // Remove the dragged card from order
+    const newOrder = currentOrder.filter((id) => id !== card.instanceId);
+
+    if (targetCard) {
+      // Get the data-instanceid of the target card
+      const dropTargetId = targetCard.getAttribute('data-instanceid');
+      if (dropTargetId && dropTargetId !== card.instanceId) {
+        // Find the index of the target card and insert before it
+        const targetIdx = newOrder.indexOf(dropTargetId);
+        if (targetIdx >= 0) {
+          newOrder.splice(targetIdx, 0, card.instanceId);
+        } else {
+          newOrder.push(card.instanceId);
+        }
+      } else {
+        // Dropped on self or no valid target, append to end
+        newOrder.push(card.instanceId);
+      }
+    } else {
+      // Dropped on arena background, append to end
+      newOrder.push(card.instanceId);
+    }
+
+    // Update the order
+    this.arenaCardOrder.update((orders) => ({
+      ...orders,
+      [arena]: newOrder,
+    }));
   }
 
   private getZoneFromEvent(event: DragEvent): CardZone | null {
@@ -700,6 +1158,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     } else if (to === 'hand') {
       await this.gameHub.returnToHand(cardId);
     } else if (to === 'build') {
+      // Battle cards cannot go to build zone
+      if (card && card.cardType === CARD_TYPE_BATTLE) {
+        this.notifications.error('Battle cards cannot be placed in the build zone');
+        return;
+      }
       await this.gameHub.moveToBuild(cardId);
     }
   }
@@ -716,6 +1179,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     await this.gameHub.drawCards(1);
   }
 
+  async drawSevenCards(): Promise<void> {
+    await this.gameHub.drawCards(7);
+  }
+
   async rollDice(): Promise<void> {
     const count = this.diceCount.value ?? 1;
     await this.gameHub.rollDice(count);
@@ -726,6 +1193,30 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     if (!message) return;
     await this.gameHub.sendChatMessage(message);
     this.chatInput.setValue('');
+  }
+
+  async submitBid(): Promise<void> {
+    const bid = this.bidInput.value;
+    if (!bid || bid <= 0) {
+      this.notifications.warning('Please enter a positive number');
+      return;
+    }
+    await this.gameHub.submitBid(bid);
+    this.notifications.success('Bid submitted');
+  }
+
+  async revealBids(): Promise<void> {
+    await this.gameHub.revealBids();
+  }
+
+  async hideBids(): Promise<void> {
+    await this.gameHub.hideBids();
+  }
+
+  async clearBid(): Promise<void> {
+    await this.gameHub.clearBid();
+    this.bidInput.setValue(null);
+    this.notifications.info('Bid cleared');
   }
 
   linkifyMessage(message: string): string {
@@ -971,5 +1462,401 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   // Get stack size
   getStackSize(card: CardInstanceDto): number {
     return (card.stackedUnderIds?.length ?? 0) + 1;
+  }
+
+  // Piloting helpers
+
+  // Check if a card is a pilot
+  isPilot(card: CardInstanceDto): boolean {
+    return card.isPilot === true;
+  }
+
+  // Check if a unit has pilots attached
+  hasPilots(card: CardInstanceDto): boolean {
+    return card.pilotCardIds && card.pilotCardIds.length > 0;
+  }
+
+  // Get pilot cards attached to a unit (searches all arenas including opponent's)
+  getPilotCards(card: CardInstanceDto): CardInstanceDto[] {
+    if (!card.pilotCardIds || card.pilotCardIds.length === 0) return [];
+    
+    // Get all cards from all arenas (mine and opponent's)
+    const allArenaCards = [
+      ...this.getMyArenaCards('space'),
+      ...this.getMyArenaCards('ground'),
+      ...this.getMyArenaCards('character'),
+      ...this.getOpponentTeamArenaCards('space'),
+      ...this.getOpponentTeamArenaCards('ground'),
+      ...this.getOpponentTeamArenaCards('character'),
+    ];
+    
+    return card.pilotCardIds
+      .map((id) => allArenaCards.find((c) => c.instanceId === id))
+      .filter((c): c is CardInstanceDto => c !== undefined);
+  }
+
+  // Check if a card is currently piloting a unit
+  isPiloting(card: CardInstanceDto): boolean {
+    return card.pilotingUnitId !== null && card.pilotingUnitId !== undefined;
+  }
+
+  // Open pilot card context menu
+  openPilotCardMenu(event: MouseEvent, pilotCard: CardInstanceDto, unitCard: CardInstanceDto): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.pilotMenuCardId.set(pilotCard.instanceId);
+    this.pilotMenuUnitCard.set(unitCard);
+    this.pilotMenuX.set(event.clientX);
+    this.pilotMenuY.set(event.clientY);
+  }
+
+  closePilotMenu(): void {
+    this.pilotMenuCardId.set(null);
+    this.pilotMenuUnitCard.set(null);
+  }
+
+  // Detach pilot from the pilot context menu
+  async detachPilotFromPilotMenu(): Promise<void> {
+    const pilotCard = this.pilotMenuCard();
+    if (!pilotCard) return;
+    
+    const result = await this.gameHub.removePilot(pilotCard.instanceId);
+    if (result.success) {
+      this.notifications.success(`${pilotCard.cardName} detached`);
+    } else if (result.errorMessage) {
+      this.notifications.error(result.errorMessage);
+    }
+    this.closePilotMenu();
+  }
+
+  // Zoom on unit from pilot menu
+  zoomUnitFromPilotMenu(): void {
+    const unitCard = this.pilotMenuUnitCard();
+    if (unitCard) {
+      this.zoomCard.set(unitCard);
+    }
+    this.closePilotMenu();
+  }
+
+  // Zoom on pilot from pilot menu
+  zoomPilotFromPilotMenu(): void {
+    const pilotCard = this.pilotMenuCard();
+    if (pilotCard) {
+      this.zoomCard.set(pilotCard);
+    }
+    this.closePilotMenu();
+  }
+
+  // Open pilot modal for selecting unit to pilot
+  openPilotModal(card: CardInstanceDto): void {
+    this.pilotModalCard.set(card);
+    this.showPilotModal.set(true);
+    this.closeCardMenu();
+    this.closeHandCardMenu();
+    this.closeBuildCardMenu();
+  }
+
+  closePilotModal(): void {
+    this.showPilotModal.set(false);
+    this.pilotModalCard.set(null);
+  }
+
+  // Pilot a unit from the modal
+  async pilotUnitFromModal(targetUnit: CardInstanceDto): Promise<void> {
+    const pilotCard = this.pilotModalCard();
+    if (!pilotCard) return;
+    
+    const result = await this.gameHub.addPilot(pilotCard.instanceId, targetUnit.instanceId);
+    if (result.success) {
+      this.notifications.success(`${pilotCard.cardName} is now piloting ${targetUnit.cardName}`);
+    } else if (result.errorMessage) {
+      this.notifications.error(result.errorMessage);
+    }
+    this.closePilotModal();
+  }
+
+  // Equipment context menu methods
+
+  openEquipmentCardMenu(event: MouseEvent, equipmentCard: CardInstanceDto, unitCard: CardInstanceDto): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.equipmentMenuCardId.set(equipmentCard.instanceId);
+    this.equipmentMenuUnitCard.set(unitCard);
+    this.equipmentMenuX.set(event.clientX);
+    this.equipmentMenuY.set(event.clientY);
+  }
+
+  closeEquipmentMenu(): void {
+    this.equipmentMenuCardId.set(null);
+    this.equipmentMenuUnitCard.set(null);
+  }
+
+  async discardEquipmentFromMenu(): Promise<void> {
+    const equipCard = this.equipmentMenuCard();
+    if (!equipCard) return;
+    
+    await this.gameHub.discardCard(equipCard.instanceId);
+    this.notifications.success(`${equipCard.cardName} discarded`);
+    this.closeEquipmentMenu();
+  }
+
+  async moveEquipmentToHandFromMenu(): Promise<void> {
+    const equipCard = this.equipmentMenuCard();
+    if (!equipCard) return;
+    
+    await this.gameHub.returnToHand(equipCard.instanceId);
+    this.notifications.success(`${equipCard.cardName} returned to hand`);
+    this.closeEquipmentMenu();
+  }
+
+  zoomEquipmentFromMenu(): void {
+    const equipCard = this.equipmentMenuCard();
+    if (equipCard) {
+      this.zoomCard.set(equipCard);
+    }
+    this.closeEquipmentMenu();
+  }
+
+  zoomUnitFromEquipmentMenu(): void {
+    const unitCard = this.equipmentMenuUnitCard();
+    if (unitCard) {
+      this.zoomCard.set(unitCard);
+    }
+    this.closeEquipmentMenu();
+  }
+
+  // Equipment modal methods
+
+  openEquipmentModal(card: CardInstanceDto): void {
+    this.equipmentModalCard.set(card);
+    this.showEquipmentModal.set(true);
+    this.closeCardMenu();
+    this.closeHandCardMenu();
+    this.closeBuildCardMenu();
+  }
+
+  closeEquipmentModal(): void {
+    this.showEquipmentModal.set(false);
+    this.equipmentModalCard.set(null);
+  }
+
+  async equipUnitFromModal(targetUnit: CardInstanceDto): Promise<void> {
+    const equipCard = this.equipmentModalCard();
+    if (!equipCard) return;
+    
+    const result = await this.gameHub.addEquipment(equipCard.instanceId, targetUnit.instanceId);
+    if (result.success) {
+      this.notifications.success(`${equipCard.cardName} equipped to ${targetUnit.cardName}`);
+    } else if (result.errorMessage) {
+      this.notifications.error(result.errorMessage);
+    }
+    this.closeEquipmentModal();
+  }
+
+  // Equipment helpers
+
+  // Check if a unit has equipment attached
+  hasEquipment(card: CardInstanceDto): boolean {
+    return card.equipmentCardId !== null && card.equipmentCardId !== undefined;
+  }
+
+  // Get equipment card attached to a unit (searches all arenas including opponent's)
+  getEquipmentCard(card: CardInstanceDto): CardInstanceDto | null {
+    if (!card.equipmentCardId) return null;
+    
+    // Get all cards from all arenas (mine and opponent's)
+    const allArenaCards = [
+      ...this.getMyArenaCards('space'),
+      ...this.getMyArenaCards('ground'),
+      ...this.getMyArenaCards('character'),
+      ...this.getOpponentTeamArenaCards('space'),
+      ...this.getOpponentTeamArenaCards('ground'),
+      ...this.getOpponentTeamArenaCards('character'),
+    ];
+    
+    return allArenaCards.find((c) => c.instanceId === card.equipmentCardId) ?? null;
+  }
+
+  // Check if a card is currently equipped to a unit
+  isEquipped(card: CardInstanceDto): boolean {
+    return card.equippedToUnitId !== null && card.equippedToUnitId !== undefined;
+  }
+
+  // Check if a card is equipment type
+  isEquipmentCard(card: CardInstanceDto): boolean {
+    return card.cardType === CARD_TYPE_EQUIPMENT;
+  }
+
+  // Get units that can be piloted by a pilot card (units in space/ground arenas with < 2 pilots)
+  // Only returns top cards of stacks (not stacked cards)
+  getPilotableTargets(): CardInstanceDto[] {
+    const player = this.myPlayer();
+    if (!player) return [];
+    
+    // Get all my units in space and ground arenas that have less than 2 pilots
+    const spaceUnits = player.arenas['space'] || [];
+    const groundUnits = player.arenas['ground'] || [];
+    const allUnits = [...spaceUnits, ...groundUnits];
+    
+    return allUnits.filter((card: CardInstanceDto) =>
+      card.cardType === CARD_TYPE_UNIT &&
+      (card.pilotCardIds?.length ?? 0) < 2 &&
+      !card.stackParentId // Only top cards of stacks (not stacked under another card)
+    );
+  }
+
+  // Get units that can receive equipment (units with no equipment, respecting arena restrictions)
+  // Only returns top cards of stacks (not stacked cards)
+  getEquippableTargets(equipmentCard: CardInstanceDto): CardInstanceDto[] {
+    // Get all my units in arenas that have no equipment and match arena restrictions
+    let arenaUnits: CardInstanceDto[] = [];
+    if (equipmentCard.cardArena) {
+      // Equipment has designated arena restriction
+      const arena = equipmentCard.cardArena.toLowerCase();
+      arenaUnits = this.getMyArenaCards(arena);
+    } else {
+      // Equipment can go on any unit in any arena
+      arenaUnits = [
+        ...this.getMyArenaCards('space'),
+        ...this.getMyArenaCards('ground'),
+        ...this.getMyArenaCards('character'),
+      ];
+    }
+    
+    return arenaUnits.filter((card: CardInstanceDto) =>
+      card.cardType === CARD_TYPE_UNIT &&
+      !card.equipmentCardId &&
+      !card.stackParentId // Only top cards of stacks
+    );
+  }
+
+  // Pilot/Equipment actions
+
+  async addPilotToUnit(pilotCard: CardInstanceDto, targetUnit: CardInstanceDto): Promise<void> {
+    const result = await this.gameHub.addPilot(pilotCard.instanceId, targetUnit.instanceId);
+    if (!result.success && result.errorMessage) {
+      this.notifications.error(result.errorMessage);
+    }
+  }
+
+  async removePilotFromUnit(pilotCard: CardInstanceDto): Promise<void> {
+    const result = await this.gameHub.removePilot(pilotCard.instanceId);
+    if (!result.success && result.errorMessage) {
+      this.notifications.error(result.errorMessage);
+    }
+  }
+
+  async addEquipmentToUnit(equipmentCard: CardInstanceDto, targetUnit: CardInstanceDto): Promise<void> {
+    const result = await this.gameHub.addEquipment(equipmentCard.instanceId, targetUnit.instanceId);
+    if (!result.success && result.errorMessage) {
+      this.notifications.error(result.errorMessage);
+    }
+  }
+
+  async removeEquipmentFromUnit(equipmentCard: CardInstanceDto): Promise<void> {
+    const result = await this.gameHub.removeEquipment(equipmentCard.instanceId);
+    if (!result.success && result.errorMessage) {
+      this.notifications.error(result.errorMessage);
+    }
+  }
+
+  // Helper to find a card by ID across all player areas
+  private findMyCard(cardId: string): CardInstanceDto | undefined {
+    const player = this.myPlayer();
+    if (!player) return undefined;
+    
+    // Check hand
+    let card = player.hand.find((c: CardInstanceDto) => c.instanceId === cardId);
+    if (card) return card;
+    
+    // Check all arenas
+    for (const arenaCards of Object.values(player.arenas)) {
+      card = arenaCards.find((c: CardInstanceDto) => c.instanceId === cardId);
+      if (card) return card;
+    }
+    
+    // Check build zone
+    card = player.buildZone.find((c: CardInstanceDto) => c.instanceId === cardId);
+    if (card) return card;
+    
+    // Check discard pile
+    card = player.discardPile.find((c: CardInstanceDto) => c.instanceId === cardId);
+    return card;
+  }
+
+  // Context menu handlers for pilot/equipment
+  async attachPilotFromHandMenu(targetUnitId: string): Promise<void> {
+    const pilotCard = this.handCardMenuCard();
+    if (!pilotCard) return;
+    
+    const targetUnit = this.findMyCard(targetUnitId);
+    if (!targetUnit) return;
+    
+    await this.addPilotToUnit(pilotCard, targetUnit);
+    this.closeHandCardMenu();
+  }
+
+  async attachEquipmentFromHandMenu(targetUnitId: string): Promise<void> {
+    const equipCard = this.handCardMenuCard();
+    if (!equipCard) return;
+    
+    const targetUnit = this.findMyCard(targetUnitId);
+    if (!targetUnit) return;
+    
+    await this.addEquipmentToUnit(equipCard, targetUnit);
+    this.closeHandCardMenu();
+  }
+
+  // Remove pilot from card menu
+  async detachPilotFromMenu(pilotCard: CardInstanceDto): Promise<void> {
+    await this.removePilotFromUnit(pilotCard);
+    this.closeCardMenu();
+  }
+
+  // Remove equipment from card menu
+  async detachEquipmentFromMenu(): Promise<void> {
+    const card = this.cardMenuCard();
+    if (!card || !card.equipmentCardId) return;
+    
+    const equipCard = this.findMyCard(card.equipmentCardId);
+    if (!equipCard) return;
+    
+    await this.removeEquipmentFromUnit(equipCard);
+    this.closeCardMenu();
+  }
+
+  // Build zone context menu handlers for pilot/equipment
+  async attachPilotFromBuildMenu(targetUnitId: string): Promise<void> {
+    const pilotCard = this.buildCardMenuCard();
+    if (!pilotCard) return;
+    
+    const targetUnit = this.findMyCard(targetUnitId);
+    if (!targetUnit) return;
+    
+    await this.addPilotToUnit(pilotCard, targetUnit);
+    this.closeBuildCardMenu();
+  }
+
+  async attachEquipmentFromBuildMenu(targetUnitId: string): Promise<void> {
+    const equipCard = this.buildCardMenuCard();
+    if (!equipCard) return;
+    
+    const targetUnit = this.findMyCard(targetUnitId);
+    if (!targetUnit) return;
+    
+    await this.addEquipmentToUnit(equipCard, targetUnit);
+    this.closeBuildCardMenu();
+  }
+
+  // Arena context menu handler for attaching pilot from Character arena
+  async attachPilotFromArenaMenu(targetUnitId: string): Promise<void> {
+    const pilotCard = this.cardMenuCard();
+    if (!pilotCard) return;
+    
+    const targetUnit = this.findMyCard(targetUnitId);
+    if (!targetUnit) return;
+    
+    await this.addPilotToUnit(pilotCard, targetUnit);
+    this.closeCardMenu();
   }
 }

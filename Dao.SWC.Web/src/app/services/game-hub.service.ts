@@ -3,7 +3,17 @@ import * as signalR from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Alignment } from '../models/dtos/card.dto';
-import { CardInstanceDto, ChatMessage, DiceRolledEvent, GameRoomDto, PlayCardResultDto, RoomType, StackResultDto } from '../models/dtos/game.dto';
+import {
+  CardInstanceDto,
+  ChatMessage,
+  DiceRolledEvent,
+  EquipmentResultDto,
+  GameRoomDto,
+  PilotResultDto,
+  PlayCardResultDto,
+  RoomType,
+  StackResultDto,
+} from '../models/dtos/game.dto';
 import { AuthService } from './auth.service';
 
 interface SignalRTokenResponse {
@@ -307,6 +317,11 @@ export class GameHubService {
     await this.hubConnection.invoke('ToggleArenaRetreat', arena);
   }
 
+  async toggleCardRetreat(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ToggleCardRetreat', cardInstanceId);
+  }
+
   async moveFromBuild(cardInstanceId: string, arena: string): Promise<PlayCardResultDto> {
     if (!this.hubConnection || !this._currentRoomCode) {
       return { success: false, errorMessage: 'Not connected to a room', card: null, wasAutoStacked: false };
@@ -361,6 +376,70 @@ export class GameHubService {
   async sendChatMessage(message: string): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('SendChatMessage', message);
+  }
+
+  // Bidding
+
+  async submitBid(bid: number): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('SubmitBid', bid);
+  }
+
+  async revealBids(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('RevealBids');
+  }
+
+  async hideBids(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('HideBids');
+  }
+
+  async clearBid(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ClearBid');
+  }
+
+  // Piloting
+
+  async addPilot(pilotCardId: string, targetUnitId: string): Promise<PilotResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected to a room', pilotCard: null, unitCard: null };
+    }
+    return await this.hubConnection.invoke<PilotResultDto>('AddPilot', pilotCardId, targetUnitId);
+  }
+
+  async removePilot(pilotCardId: string): Promise<PilotResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected to a room', pilotCard: null, unitCard: null };
+    }
+    return await this.hubConnection.invoke<PilotResultDto>('RemovePilot', pilotCardId);
+  }
+
+  async getPilotableUnits(pilotCardId: string): Promise<CardInstanceDto[]> {
+    if (!this.hubConnection || !this._currentRoomCode) return [];
+    return await this.hubConnection.invoke<CardInstanceDto[]>('GetPilotableUnits', pilotCardId);
+  }
+
+  // Equipment
+
+  async addEquipment(equipmentCardId: string, targetUnitId: string): Promise<EquipmentResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected to a room', equipmentCard: null, unitCard: null };
+    }
+    return await this.hubConnection.invoke<EquipmentResultDto>('AddEquipment', equipmentCardId, targetUnitId);
+  }
+
+  async removeEquipment(equipmentCardId: string): Promise<EquipmentResultDto> {
+    if (!this.hubConnection || !this._currentRoomCode) {
+      return { success: false, errorMessage: 'Not connected to a room', equipmentCard: null, unitCard: null };
+    }
+    return await this.hubConnection.invoke<EquipmentResultDto>('RemoveEquipment', equipmentCardId);
+  }
+
+  async getEquippableUnits(equipmentCardId: string): Promise<CardInstanceDto[]> {
+    if (!this.hubConnection || !this._currentRoomCode) return [];
+    return await this.hubConnection.invoke<CardInstanceDto[]>('GetEquippableUnits', equipmentCardId);
   }
 
   private extractUsername(room: GameRoomDto): string | null {

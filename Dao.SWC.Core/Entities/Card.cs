@@ -31,6 +31,12 @@ public class Card
     /// </summary>
     public string? CardText { get; set; }
 
+    /// <summary>
+    /// Whether this character card can pilot units in space/ground arenas.
+    /// Only applicable to character unit cards.
+    /// </summary>
+    public bool IsPilot { get; set; }
+
     // Navigation property
     public ICollection<DeckCard> DeckCards { get; set; } = [];
 }

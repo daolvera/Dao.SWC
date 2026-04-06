@@ -69,6 +69,12 @@ public class CardInstance
     /// </summary>
     public int? ZonePosition { get; set; }
 
+    /// <summary>
+    /// The user ID of the player who owns this card.
+    /// Used in team modes to track ownership within shared team arenas.
+    /// </summary>
+    public string? OwnerUserId { get; set; }
+
     #region Card Stacking (Versioned Units)
 
     /// <summary>
@@ -92,6 +98,65 @@ public class CardInstance
     /// Whether this card is stacked under another card.
     /// </summary>
     public bool IsStackedUnder => StackParentId.HasValue;
+
+    #endregion
+
+    #region Piloting
+
+    /// <summary>
+    /// Whether this character card can pilot units.
+    /// Only applicable to character unit cards.
+    /// </summary>
+    public bool IsPilot { get; set; }
+
+    /// <summary>
+    /// List of pilot card instance IDs attached to this unit.
+    /// Only units in space/ground arenas can have pilots.
+    /// Maximum of 2 pilots per unit.
+    /// </summary>
+    public List<Guid> PilotCardIds { get; set; } = [];
+
+    /// <summary>
+    /// If this card is piloting a unit, this is the instance ID of the unit being piloted.
+    /// Null if this card is not piloting anything.
+    /// </summary>
+    public Guid? PilotingUnitId { get; set; }
+
+    /// <summary>
+    /// Whether this unit has any pilots attached.
+    /// </summary>
+    public bool HasPilots => PilotCardIds.Count > 0;
+
+    /// <summary>
+    /// Whether this card is currently piloting a unit.
+    /// </summary>
+    public bool IsPiloting => PilotingUnitId.HasValue;
+
+    #endregion
+
+    #region Equipment
+
+    /// <summary>
+    /// The instance ID of the equipment card attached to this unit.
+    /// Null if no equipment is attached. Only one equipment per unit.
+    /// </summary>
+    public Guid? EquipmentCardId { get; set; }
+
+    /// <summary>
+    /// If this card is equipment attached to a unit, this is the instance ID of the unit.
+    /// Null if this equipment is not attached to anything.
+    /// </summary>
+    public Guid? EquippedToUnitId { get; set; }
+
+    /// <summary>
+    /// Whether this unit has equipment attached.
+    /// </summary>
+    public bool HasEquipment => EquipmentCardId.HasValue;
+
+    /// <summary>
+    /// Whether this equipment is attached to a unit.
+    /// </summary>
+    public bool IsEquipped => EquippedToUnitId.HasValue;
 
     #endregion
 }

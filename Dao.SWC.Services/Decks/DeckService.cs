@@ -157,6 +157,7 @@ public class DeckService(
                         dc.Card.Alignment,
                         dc.Card.Arena,
                         dc.Card.Version,
+                        dc.Card.IsPilot,
                         imageUrl,
                         dc.Card.CardText
                     )

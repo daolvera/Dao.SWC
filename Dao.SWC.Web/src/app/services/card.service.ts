@@ -5,6 +5,7 @@ import { environment } from '../../environments/environment';
 import { CardDto, CardUpdateDto, CardCreateDto } from '../models/dtos/card.dto';
 import { CardFilter } from '../models/filters/card-filter';
 import { PagedResult } from '../models/results/paged-result';
+import { form } from '@angular/forms/signals';
 
 @Injectable({
   providedIn: 'root',
@@ -60,6 +61,7 @@ export class CardService {
     formData.append('name', dto.name);
     formData.append('type', dto.type.toString());
     formData.append('alignment', dto.alignment.toString());
+    formData.append('isPilot', dto.isPilot.toString());
     if (dto.arena !== null) {
       formData.append('arena', dto.arena.toString());
     }

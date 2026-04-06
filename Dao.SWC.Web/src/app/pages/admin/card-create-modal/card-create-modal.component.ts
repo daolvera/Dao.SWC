@@ -108,7 +108,7 @@ import { CardService } from '../../../services/card.service';
               <option [ngValue]="Arena.Character">Character</option>
             </select>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-3">
             <label class="form-label">Version</label>
             <input
               type="text"
@@ -116,6 +116,18 @@ import { CardService } from '../../../services/card.service';
               [(ngModel)]="cardVersion"
               placeholder="A, B, C..."
             />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Pilot</label>
+            <div class="form-check mt-2">
+              <input
+                type="checkbox"
+                class="form-check-input"
+                id="isPilotCheck"
+                [(ngModel)]="cardIsPilot"
+              />
+              <label class="form-check-label" for="isPilotCheck">Is Pilot</label>
+            </div>
           </div>
         </div>
 
@@ -169,6 +181,7 @@ export class CardCreateModalComponent {
   cardAlignment = Alignment.Light;
   cardArena: Arena | null = null;
   cardVersion: string | null = null;
+  cardIsPilot = false;
   cardText: string | null = null;
 
   // UI state
@@ -194,6 +207,7 @@ export class CardCreateModalComponent {
     this.cardAlignment = Alignment.Light;
     this.cardArena = null;
     this.cardVersion = null;
+    this.cardIsPilot = false;
     this.cardText = null;
     this.selectedFile = null;
     this.imagePreview.set(null);
@@ -255,6 +269,7 @@ export class CardCreateModalComponent {
       alignment: this.cardAlignment,
       arena: this.cardArena,
       version: this.cardVersion?.trim() || null,
+      isPilot: this.cardIsPilot,
       cardText: this.cardText?.trim() || null,
     };
 

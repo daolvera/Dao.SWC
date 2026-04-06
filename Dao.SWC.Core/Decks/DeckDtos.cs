@@ -9,6 +9,7 @@ public record CardDto(
     Alignment Alignment,
     Arena? Arena,
     string? Version,
+    bool IsPilot,
     string? ImageUrl,
     string? CardText
 );
@@ -51,6 +52,7 @@ public record CardUpdateDto(
     Alignment Alignment,
     Arena? Arena,
     string? Version,
+    bool IsPilot,
     string? ImageUrl,
     string? CardText
 );
@@ -61,6 +63,7 @@ public record CardCreateDto(
     Alignment Alignment,
     Arena? Arena,
     string? Version,
+    bool IsPilot,
     string? ImageUrl,
     string? CardText
 );

@@ -41,6 +41,11 @@ public class GamePlayer
     public bool CharacterArenaRetreated { get; set; }
 
     /// <summary>
+    /// Secret bid for bidding system (used in 1v1 mode where each player is their own team).
+    /// </summary>
+    public int? SecretBid { get; set; }
+
+    /// <summary>
     /// The alignment of the player's deck (Light, Dark, or Neutral).
     /// </summary>
     public Alignment DeckAlignment { get; set; }

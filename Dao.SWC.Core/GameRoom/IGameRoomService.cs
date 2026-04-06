@@ -19,6 +19,40 @@ public class StackResult
 }
 
 /// <summary>
+/// Result of a pilot operation.
+/// </summary>
+public class PilotResult
+{
+    public bool Success { get; init; }
+    public string? ErrorMessage { get; init; }
+    public CardInstance? PilotCard { get; init; }
+    public CardInstance? UnitCard { get; init; }
+
+    public static PilotResult Ok(CardInstance pilotCard, CardInstance unitCard) =>
+        new() { Success = true, PilotCard = pilotCard, UnitCard = unitCard };
+
+    public static PilotResult Fail(string errorMessage) =>
+        new() { Success = false, ErrorMessage = errorMessage };
+}
+
+/// <summary>
+/// Result of an equipment operation.
+/// </summary>
+public class EquipmentResult
+{
+    public bool Success { get; init; }
+    public string? ErrorMessage { get; init; }
+    public CardInstance? EquipmentCard { get; init; }
+    public CardInstance? UnitCard { get; init; }
+
+    public static EquipmentResult Ok(CardInstance equipmentCard, CardInstance unitCard) =>
+        new() { Success = true, EquipmentCard = equipmentCard, UnitCard = unitCard };
+
+    public static EquipmentResult Fail(string errorMessage) =>
+        new() { Success = false, ErrorMessage = errorMessage };
+}
+
+/// <summary>
 /// Result of a play card operation.
 /// </summary>
 public class PlayCardResult
@@ -227,6 +261,11 @@ public interface IGameRoomService
     Task<bool> ToggleArenaRetreatAsync(string roomCode, string userId, string arena);
 
     /// <summary>
+    /// Toggle retreat state of an individual card in play.
+    /// </summary>
+    Task<CardInstance?> ToggleCardRetreatAsync(string roomCode, string userId, Guid cardInstanceId);
+
+    /// <summary>
     /// Update a player's Build counter.
     /// </summary>
     Task<bool> UpdateBuildCounterAsync(string roomCode, string userId, int buildCounter);
@@ -316,6 +355,76 @@ public interface IGameRoomService
         string userId,
         Guid cardInstanceId,
         string targetArena
+    );
+
+    #endregion
+
+    #region Piloting
+
+    /// <summary>
+    /// Add a pilot to a unit in the space or ground arena.
+    /// </summary>
+    /// <param name="roomCode">The room code</param>
+    /// <param name="userId">The player's user ID</param>
+    /// <param name="pilotCardId">The pilot card to add (must have IsPilot=true)</param>
+    /// <param name="targetUnitId">The unit to pilot (must be in space or ground arena)</param>
+    /// <returns>PilotResult with success status and updated cards</returns>
+    Task<PilotResult> AddPilotAsync(
+        string roomCode,
+        string userId,
+        Guid pilotCardId,
+        Guid targetUnitId
+    );
+
+    /// <summary>
+    /// Remove a pilot from a unit.
+    /// </summary>
+    /// <param name="roomCode">The room code</param>
+    /// <param name="userId">The player's user ID</param>
+    /// <param name="pilotCardId">The pilot card to remove</param>
+    /// <returns>PilotResult with success status and updated cards</returns>
+    Task<PilotResult> RemovePilotAsync(string roomCode, string userId, Guid pilotCardId);
+
+    /// <summary>
+    /// Get units that can be piloted by a given pilot card.
+    /// </summary>
+    IEnumerable<CardInstance> GetPilotableUnits(string roomCode, string userId, Guid pilotCardId);
+
+    #endregion
+
+    #region Equipment
+
+    /// <summary>
+    /// Add equipment to a unit.
+    /// </summary>
+    /// <param name="roomCode">The room code</param>
+    /// <param name="userId">The player's user ID</param>
+    /// <param name="equipmentCardId">The equipment card to add</param>
+    /// <param name="targetUnitId">The unit to equip</param>
+    /// <returns>EquipmentResult with success status and updated cards</returns>
+    Task<EquipmentResult> AddEquipmentAsync(
+        string roomCode,
+        string userId,
+        Guid equipmentCardId,
+        Guid targetUnitId
+    );
+
+    /// <summary>
+    /// Remove equipment from a unit.
+    /// </summary>
+    /// <param name="roomCode">The room code</param>
+    /// <param name="userId">The player's user ID</param>
+    /// <param name="equipmentCardId">The equipment card to remove</param>
+    /// <returns>EquipmentResult with success status and updated cards</returns>
+    Task<EquipmentResult> RemoveEquipmentAsync(string roomCode, string userId, Guid equipmentCardId);
+
+    /// <summary>
+    /// Get units that can have a given equipment card attached.
+    /// </summary>
+    IEnumerable<CardInstance> GetEquippableUnits(
+        string roomCode,
+        string userId,
+        Guid equipmentCardId
     );
 
     #endregion

@@ -122,6 +122,29 @@ public class AdminController(
     }
 
     /// <summary>
+    /// Get user statistics including deck counts.
+    /// </summary>
+    [HttpGet("user-stats")]
+    [ProducesResponseType(typeof(IEnumerable<UserStatsDto>), 200)]
+    public async Task<IActionResult> GetUserStats()
+    {
+        var stats = (await dbContext.Users
+            .Include(u => u.Decks)
+            .ToListAsync())
+            .Select(u => new UserStatsDto(
+                u.Id,
+                u.DisplayName ?? u.UserName ?? "Unknown",
+                u.Email ?? "",
+                u.Decks.Count,
+                u.CreatedAt
+            ))
+            .OrderBy(s => s.DisplayName)
+            .ToList();
+
+        return Ok(stats);
+    }
+
+    /// <summary>
     /// Seed test cards into the database. Requires Admin role.
     /// </summary>
     [HttpPost("seed-cards")]
@@ -415,3 +438,5 @@ public record UserRoleDto(string Id, string Email, string Name, List<string> Rol
 public record AssignRoleDto(string Email, string Role);
 
 public record SeedCardsResult(int CardsAdded, int TotalCards);
+
+public record UserStatsDto(string Id, string DisplayName, string Email, int DeckCount, DateTime CreatedAt);

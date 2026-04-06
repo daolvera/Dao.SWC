@@ -24,6 +24,13 @@ export class NavigationService {
       requiresRole: 'CardEditor',
     },
     {
+      label: 'User Stats',
+      route: '/admin/users',
+      icon: 'people',
+      requiresAuth: true,
+      requiresRole: 'Admin',
+    },
+    {
       label: 'Resources',
       icon: 'file-earmark-pdf',
       children: [

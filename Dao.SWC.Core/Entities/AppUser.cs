@@ -8,4 +8,5 @@ public class AppUser : IdentityUser, ITrackingBase
     public DateTime? RefreshTokenExpiry { get; set; }
     public string? DisplayName { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public ICollection<Deck> Decks { get; set; } = [];
 }

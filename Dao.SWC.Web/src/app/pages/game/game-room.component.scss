@@ -160,6 +160,21 @@
           font-weight: bold;
         }
 
+        .build-display {
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+
+        .build-label {
+          opacity: 0.7;
+        }
+
+        .build-value {
+          color: #87ceeb;
+          font-weight: bold;
+        }
+
         .card-counts {
           display: flex;
           gap: 0.5rem;
@@ -909,6 +924,34 @@
         object-fit: cover;
       }
 
+      /* Sideways cards: rotate the image 90deg counter-clockwise to display correctly when container is rotated */
+      .game-card.sideways img {
+        transform: rotate(-90deg);
+        transform-origin: center center;
+        /* Scale to fill the rotated container - swap width/height */
+        width: 140%;
+        height: 71.4%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-top: -35.7%;
+        margin-left: -70%;
+      }
+
+      .game-card.sideways.small img {
+        width: 140%;
+        height: 71.4%;
+        margin-top: -35.7%;
+        margin-left: -70%;
+      }
+
+      .game-card.sideways.tiny img {
+        width: 140%;
+        height: 71.4%;
+        margin-top: -35.7%;
+        margin-left: -70%;
+      }
+
       .card-name {
         position: absolute;
         bottom: 0;
@@ -1053,6 +1096,64 @@
         gap: 0.25rem;
       }
 
+      /* Bidding */
+      .bidding-section {
+        border-bottom: none !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0.5rem !important;
+      }
+
+      .bid-input-group {
+        .input-group {
+          .form-control {
+            font-size: 0.8rem;
+          }
+        }
+      }
+
+      .current-bid {
+        display: flex;
+        align-items: center;
+        font-size: 0.75rem;
+      }
+
+      .bid-host-controls {
+        button {
+          font-size: 0.75rem;
+        }
+      }
+
+      .revealed-bids {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+        padding: 0.5rem;
+      }
+
+      .bid-result {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 0.8rem;
+
+        &:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+      }
+
+      .bid-label {
+        color: #6ea8fe;
+        font-weight: 500;
+      }
+
+      .bid-value {
+        color: #ffd700;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
       /* Modal */
       .modal-overlay {
         position: fixed;
@@ -1076,6 +1177,134 @@
       .modal-content.large {
         width: 80vw;
         max-width: 900px;
+      }
+
+      /* Pilot Selection Modal */
+      .pilot-modal {
+        width: 400px;
+        max-width: 90vw;
+      }
+
+      .pilot-modal-subtitle {
+        color: rgba(128, 0, 128, 0.9);
+        font-style: italic;
+        margin-bottom: 1rem;
+      }
+
+      .pilot-targets-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .pilot-target-option {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: rgba(128, 0, 128, 0.3);
+          border-color: rgba(128, 0, 128, 0.6);
+        }
+
+        img {
+          width: 50px;
+          height: 70px;
+          object-fit: cover;
+          border-radius: 4px;
+        }
+
+        .target-info {
+          text-align: left;
+        }
+
+        .target-name {
+          font-weight: 600;
+          color: white;
+        }
+
+        .target-arena {
+          font-size: 0.85rem;
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        .target-pilots {
+          font-size: 0.75rem;
+          color: rgba(128, 0, 128, 0.9);
+        }
+      }
+
+      .no-targets {
+        color: rgba(255, 255, 255, 0.5);
+        font-style: italic;
+        text-align: center;
+        padding: 1rem;
+      }
+
+      /* Equipment Selection Modal */
+      .equipment-modal {
+        width: 400px;
+        max-width: 90vw;
+      }
+
+      .equipment-modal-subtitle {
+        color: rgba(128, 128, 128, 0.9);
+        font-style: italic;
+        margin-bottom: 1rem;
+      }
+
+      .equipment-targets-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .equipment-target-option {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+          background: rgba(128, 128, 128, 0.3);
+          border-color: rgba(128, 128, 128, 0.6);
+        }
+
+        img {
+          width: 50px;
+          height: 70px;
+          object-fit: cover;
+          border-radius: 4px;
+        }
+
+        .target-info {
+          text-align: left;
+        }
+
+        .target-name {
+          font-weight: 600;
+          color: white;
+        }
+
+        .target-arena {
+          font-size: 0.85rem;
+          color: rgba(255, 255, 255, 0.7);
+        }
       }
 
       /* Zoom Modal */
@@ -1110,6 +1339,19 @@
         object-fit: cover;
       }
 
+      /* Sideways zoom card: rotate image to display correctly */
+      .zoom-card.sideways img {
+        transform: rotate(-90deg);
+        transform-origin: center center;
+        width: 140%;
+        height: 71.4%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-top: -35.7%;
+        margin-left: -70%;
+      }
+
       .zoom-card-name {
         position: absolute;
         bottom: 20px;
@@ -1131,6 +1373,11 @@
         max-width: 500px;
       }
 
+      /* Modal cards that are sideways need extra margin to account for rotation */
+      .modal-cards .game-card.sideways {
+        margin: calc((140px - 100px) / 2) calc((140px - 100px) / 2);
+      }
+
       .modal-cards.scrollable {
         max-width: none;
         max-height: 60vh;
@@ -1140,6 +1387,49 @@
       /* Face Down Card */
       .game-card.face-down {
         border-color: #666;
+      }
+
+      /* Arena Indicator for Build Zone */
+      .arena-indicator {
+        position: absolute;
+        bottom: 18px;
+        left: 2px;
+        font-size: 0.5rem;
+        font-weight: bold;
+        padding: 1px 4px;
+        border-radius: 2px;
+        color: white;
+        text-transform: uppercase;
+        z-index: 6;
+      }
+
+      .arena-indicator.arena-space {
+        background: #3498db;
+      }
+
+      .arena-indicator.arena-ground {
+        background: #27ae60;
+      }
+
+      .arena-indicator.arena-character {
+        background: #9b59b6;
+      }
+
+      .arena-indicator.arena-sideways {
+        background: #e67e22;
+      }
+
+      .arena-indicator.arena-unknown {
+        background: #7f8c8d;
+      }
+
+      /* Sideways cards: rotate the indicator back so it's readable */
+      .game-card.sideways .arena-indicator {
+        transform: rotate(-90deg);
+        transform-origin: center center;
+        bottom: 50%;
+        left: -10px;
+        margin-bottom: -0.6em;
       }
 
       /* Tapped Indicator */
@@ -1350,6 +1640,16 @@
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
           }
         }
+        
+        /* Small card wrapper stacking styles */
+        &.small.has-stack {
+          padding: 2px;
+          border-width: 1px;
+          
+          .stacked-card {
+            width: 20px;
+          }
+        }
       }
 
       .card-stack {
@@ -1400,8 +1700,12 @@
         z-index: 10;
         position: relative;
         order: 1;  /* Top card appears last (rightmost) */
-        box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
         border-radius: 4px;
+      }
+
+      // Only apply gold glow to stack-top when card is part of a stack
+      .card-wrapper.has-stack .stack-top {
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
       }
 
       .stack-badge {
@@ -1448,6 +1752,215 @@
           border-radius: 4px;
           bottom: 8px;
           right: 8px;
+        }
+      }
+
+      // Owner badge for team mode
+      .owner-badge {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        background: rgba(147, 112, 219, 0.9);
+        color: white;
+        font-size: 0.45rem;
+        font-weight: bold;
+        padding: 1px 3px;
+        border-radius: 2px;
+        z-index: 15;
+        text-transform: uppercase;
+        
+        &.small {
+          font-size: 0.4rem;
+          padding: 1px 2px;
+        }
+        
+        &.tiny {
+          font-size: 0.35rem;
+          padding: 1px 2px;
+        }
+      }
+
+      // Owner highlight for team mode cards
+      .game-card.owner-highlight {
+        box-shadow: 0 0 0 2px rgba(147, 112, 219, 0.6);
+        
+        &[data-owner]:not([data-owner=""]) {
+          // Different colors for different owners (first two players)
+          &:nth-child(odd) {
+            box-shadow: 0 0 0 2px rgba(100, 149, 237, 0.8); // Cornflower blue
+          }
+          &:nth-child(even) {
+            box-shadow: 0 0 0 2px rgba(255, 182, 193, 0.8); // Light pink
+          }
+        }
+      }
+
+      // Pilot styling - purple highlight, side-by-side display
+      .card-wrapper.has-pilots {
+        position: relative;
+        padding: 4px;
+        border: 2px solid rgba(128, 0, 128, 0.6); // Purple
+        border-radius: 6px;
+        background: rgba(128, 0, 128, 0.15);
+        
+        .stack-top, .game-card:not(.pilot-card):not(.equipment-card) {
+          box-shadow: 0 0 10px rgba(128, 0, 128, 0.6);
+        }
+        
+        &.small {
+          padding: 2px;
+          border-width: 1px;
+        }
+      }
+
+      // Pilot card shown as narrow slice next to unit
+      .pilot-card {
+        position: relative;
+        z-index: 5;
+        order: -2; // Pilots appear leftmost
+        width: 25px;
+        flex-shrink: 0;
+        overflow: hidden;
+        border-radius: 3px;
+        border: 1px solid rgba(128, 0, 128, 0.8);
+        cursor: pointer;
+        
+        img {
+          position: absolute;
+          left: 0;
+          top: 0;
+          height: 100%;
+          width: auto;
+        }
+        
+        &.small {
+          width: 18px;
+        }
+      }
+
+      .pilot-badge {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        background: rgba(128, 0, 128, 0.9);
+        color: white;
+        font-size: 0.5rem;
+        font-weight: bold;
+        padding: 1px 3px;
+        border-radius: 2px;
+        z-index: 20;
+        
+        &.small {
+          font-size: 0.4rem;
+          padding: 1px 2px;
+        }
+      }
+
+      // Equipment styling - grey highlight
+      .card-wrapper.has-equipment {
+        padding: 4px;
+        border: 2px solid rgba(128, 128, 128, 0.6); // Grey
+        border-radius: 6px;
+        background: rgba(128, 128, 128, 0.15);
+        
+        .stack-top, .game-card:not(.pilot-card):not(.equipment-card) {
+          box-shadow: 0 0 10px rgba(128, 128, 128, 0.6);
+        }
+        
+        &.small {
+          padding: 2px;
+          border-width: 1px;
+        }
+      }
+
+      .equipment-card {
+        position: relative;
+        z-index: 4;
+        order: -1; // Equipment appears between pilots and main card
+        flex-shrink: 0;
+        border-radius: 3px;
+        border: 2px solid rgba(128, 128, 128, 0.8);
+        
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 2px;
+        }
+        
+        // Equipment cards are sideways (wider than tall), so swap dimensions
+        &.small {
+          width: 70px;
+          height: 50px;
+        }
+      }
+
+      .equipment-badge {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        background: rgba(128, 128, 128, 0.9);
+        color: white;
+        font-size: 0.5rem;
+        font-weight: bold;
+        padding: 1px 3px;
+        border-radius: 2px;
+        z-index: 20;
+        
+        &.small {
+          font-size: 0.4rem;
+          padding: 1px 2px;
+        }
+      }
+
+      // Combined pilots + equipment styling
+      .card-wrapper.has-pilots.has-equipment {
+        border: 2px solid;
+        border-image: linear-gradient(135deg, rgba(128, 0, 128, 0.6), rgba(128, 128, 128, 0.6)) 1;
+        background: linear-gradient(135deg, rgba(128, 0, 128, 0.1), rgba(128, 128, 128, 0.1));
+      }
+
+      // Hand card indicators for pilots and equipment
+      .pilot-indicator {
+        position: absolute;
+        bottom: 2px;
+        left: 2px;
+        background: rgba(128, 0, 128, 0.9);
+        color: white;
+        font-size: 0.5rem;
+        font-weight: bold;
+        padding: 1px 4px;
+        border-radius: 2px;
+        z-index: 15;
+      }
+
+      .equipment-indicator {
+        position: absolute;
+        bottom: 2px;
+        left: 2px;
+        background: rgba(128, 128, 128, 0.9);
+        color: white;
+        font-size: 0.5rem;
+        font-weight: bold;
+        padding: 1px 4px;
+        border-radius: 2px;
+        z-index: 15;
+      }
+
+      // Team mode info strip
+      .opponent-info-strip.team-mode {
+        .team-label {
+          font-weight: bold;
+          color: #ffd700;
+          margin-right: 0.5rem;
+        }
+        
+        .player-name {
+          background: rgba(255, 255, 255, 0.1);
+          padding: 0.15rem 0.4rem;
+          border-radius: 3px;
+          margin-right: 0.3rem;
+          font-size: 0.75rem;
         }
       }
 

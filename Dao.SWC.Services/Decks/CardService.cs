@@ -79,6 +79,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
                     c.Alignment,
                     c.Arena,
                     c.Version,
+                    c.IsPilot,
                     imageUrl,
                     c.CardText
                 )
@@ -114,6 +115,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
             card.Alignment,
             card.Arena,
             card.Version,
+            card.IsPilot,
             imageUrl,
             card.CardText
         );
@@ -128,6 +130,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
             Alignment = dto.Alignment,
             Arena = dto.Arena,
             Version = dto.Version,
+            IsPilot = dto.IsPilot,
             ImageUrl = dto.ImageUrl,
             CardText = dto.CardText,
         };
@@ -146,6 +149,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
             card.Alignment,
             card.Arena,
             card.Version,
+            card.IsPilot,
             imageUrl,
             card.CardText
         );
@@ -164,6 +168,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
         card.Alignment = dto.Alignment;
         card.Arena = dto.Arena;
         card.Version = dto.Version;
+        card.IsPilot = dto.IsPilot;
         card.ImageUrl = dto.ImageUrl;
         card.CardText = dto.CardText;
 
@@ -180,6 +185,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
             card.Alignment,
             card.Arena,
             card.Version,
+            card.IsPilot,
             imageUrl,
             card.CardText
         );
@@ -206,6 +212,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
             card.Alignment = dto.Alignment;
             card.Arena = dto.Arena;
             card.Version = dto.Version;
+            card.IsPilot = dto.IsPilot;
             card.ImageUrl = dto.ImageUrl;
             card.CardText = dto.CardText;
 
@@ -221,6 +228,7 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
                     card.Alignment,
                     card.Arena,
                     card.Version,
+                    card.IsPilot,
                     imageUrl,
                     card.CardText
                 )

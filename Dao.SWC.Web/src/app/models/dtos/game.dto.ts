@@ -12,17 +12,37 @@ export enum GameState {
   Finished,
 }
 
+export enum Team {
+  Team1,
+  Team2,
+}
+
 export interface GameRoomDto {
   roomCode: string;
   roomType: RoomType;
   state: GameState;
   players: GamePlayerDto[];
+  teams: TeamDataDto[] | null;
+  bidsRevealed: boolean;
+}
+
+export interface TeamDataDto {
+  team: Team;
+  force: number;
+  buildCounter: number;
+  arenas: { [arena: string]: CardInstanceDto[] };
+  buildZone: CardInstanceDto[];
+  spaceArenaRetreated: boolean;
+  groundArenaRetreated: boolean;
+  characterArenaRetreated: boolean;
+  secretBid: number | null;
 }
 
 export interface GamePlayerDto {
   username: string;
   deckName: string;
   alignment: Alignment;
+  team: Team;
   isHost: boolean;
   isConnected: boolean;
   force: number;
@@ -36,6 +56,7 @@ export interface GamePlayerDto {
   spaceArenaRetreated: boolean;
   groundArenaRetreated: boolean;
   characterArenaRetreated: boolean;
+  secretBid: number | null;
 }
 
 export interface CardInstanceDto {
@@ -53,6 +74,14 @@ export interface CardInstanceDto {
   damage: number | null;
   stackParentId: string | null;
   stackedUnderIds: string[];
+  ownerUserId: string | null;
+  // Piloting
+  isPilot: boolean;
+  pilotCardIds: string[];
+  pilotingUnitId: string | null;
+  // Equipment
+  equipmentCardId: string | null;
+  equippedToUnitId: string | null;
 }
 
 export interface DiceRolledEvent {
@@ -150,6 +179,22 @@ export interface StackResultDto {
   success: boolean;
   errorMessage: string | null;
   topCard: CardInstanceDto | null;
+}
+
+// Pilot operation result
+export interface PilotResultDto {
+  success: boolean;
+  errorMessage: string | null;
+  pilotCard: CardInstanceDto | null;
+  unitCard: CardInstanceDto | null;
+}
+
+// Equipment operation result
+export interface EquipmentResultDto {
+  success: boolean;
+  errorMessage: string | null;
+  equipmentCard: CardInstanceDto | null;
+  unitCard: CardInstanceDto | null;
 }
 
 // Play card result (for auto-stacking)

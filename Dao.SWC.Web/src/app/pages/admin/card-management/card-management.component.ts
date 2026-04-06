@@ -109,6 +109,7 @@ interface EditableCard extends CardDto {
               <th style="width: 100px;">Alignment</th>
               <th style="width: 100px;">Arena</th>
               <th style="width: 80px;">Version</th>
+              <th style="width: 60px;">Pilot</th>
               <th style="width: 200px;">Image URL</th>
               <th>Card Text</th>
               <th style="width: 60px;">Actions</th>
@@ -182,6 +183,14 @@ interface EditableCard extends CardDto {
                     [(ngModel)]="card.version"
                     (ngModelChange)="markDirty(card)"
                     placeholder="A, B..."
+                  />
+                </td>
+                <td class="align-middle text-center">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    [(ngModel)]="card.isPilot"
+                    (ngModelChange)="markDirty(card)"
                   />
                 </td>
                 <td>
@@ -404,6 +413,7 @@ export class CardManagementComponent implements OnInit {
       alignment: card.alignment,
       arena: card.arena,
       version: card.version,
+      isPilot: card.isPilot,
       imageUrl: card.imageUrl,
       cardText: card.cardText,
     }));

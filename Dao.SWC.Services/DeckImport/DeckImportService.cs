@@ -185,6 +185,7 @@ public class DeckImportService(
                     dc.Card.Alignment,
                     dc.Card.Arena,
                     dc.Card.Version,
+                    dc.Card.IsPilot,
                     dc.Card.ImageUrl,
                     dc.Card.CardText
                 )

@@ -20,6 +20,14 @@ export interface SeedCardsResult {
   totalCards: number;
 }
 
+export interface UserStatsDto {
+  id: string;
+  displayName: string;
+  email: string;
+  deckCount: number;
+  createdAt: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -45,5 +53,9 @@ export class AdminService {
 
   seedCards(): Observable<SeedCardsResult> {
     return this.http.post<SeedCardsResult>(`${this.baseUrl}/seed-cards`, {});
+  }
+
+  getUserStats(): Observable<UserStatsDto[]> {
+    return this.http.get<UserStatsDto[]>(`${this.baseUrl}/user-stats`);
   }
 }

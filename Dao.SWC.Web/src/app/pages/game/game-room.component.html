@@ -87,30 +87,459 @@
       @if (room()!.state === GameState.InProgress) {
         <div class="board-container chess-board">
           <!-- Opponent Info Strip (minimal) -->
-          @for (opponent of opponents(); track opponent.username) {
-            <div class="opponent-info-strip">
-              <span class="player-name">{{ opponent.username }}</span>
+          @if (isTeamMode()) {
+            <!-- Team Mode: Show opponent team info -->
+            <div class="opponent-info-strip team-mode">
+              <span class="team-label">Opponent Team</span>
+              @for (player of opponentTeamPlayers(); track player.username) {
+                <span class="player-name">{{ player.username }}</span>
+              }
               <span class="force-display">
                 <span class="force-label">Force:</span>
-                <span class="force-value">{{ opponent.force }}</span>
+                <span class="force-value">{{ opponentTeam()?.force ?? 0 }}</span>
+              </span>
+              <span class="build-display">
+                <span class="build-label">Build:</span>
+                <span class="build-value">{{ opponentTeam()?.buildCounter ?? 0 }}</span>
               </span>
               <span class="card-counts">
-                <span title="Hand">Hand: {{ opponent.handSize }}</span>
-                <span title="Deck">Deck: {{ opponent.deckSize }}</span>
+                @for (player of opponentTeamPlayers(); track player.username) {
+                  <span title="{{player.username}} Hand">{{ player.username }}: {{ player.handSize }}</span>
+                }
                 <button
                   class="build-btn"
-                  (click)="showOpponentBuildZone.set(opponent)"
-                  title="View build zone"
+                  (click)="showOpponentTeamBuildZone.set(true)"
+                  title="View opponent team build zone"
                 >
-                  Build ({{ opponent.buildZone.length }})
+                  Build ({{ opponentTeamBuildZone().length }})
                 </button>
               </span>
             </div>
+          } @else {
+            <!-- 1v1 Mode: Show per-player info -->
+            @for (opponent of opponents(); track opponent.username) {
+              <div class="opponent-info-strip">
+                <span class="player-name">{{ opponent.username }}</span>
+                <span class="force-display">
+                  <span class="force-label">Force:</span>
+                  <span class="force-value">{{ opponent.force }}</span>
+                </span>
+                <span class="build-display">
+                  <span class="build-label">Build:</span>
+                  <span class="build-value">{{ opponent.buildCounter }}</span>
+                </span>
+                <span class="card-counts">
+                  <span title="Hand">Hand: {{ opponent.handSize }}</span>
+                  <span title="Deck">Deck: {{ opponent.deckSize }}</span>
+                  <button
+                    class="build-btn"
+                    (click)="showOpponentBuildZone.set(opponent)"
+                    title="View build zone"
+                  >
+                    Build ({{ opponent.buildZone.length }})
+                  </button>
+                </span>
+              </div>
+            }
           }
 
           <!-- Chess-board Arena Grid -->
           <div class="arena-grid">
             <!-- Row 1: Opponent Arenas (rotated 180°) -->
+            @if (isTeamMode()) {
+              <!-- Team Mode: Single shared opponent team arena -->
+              <!-- Opponent Character Arena -->
+              <div
+                class="arena character-arena opponent-arena"
+                [class.arena-retreated]="isOpponentTeamArenaRetreated('character')"
+              >
+                    <div class="arena-label">
+                      CHARACTER
+                      @if (isOpponentTeamArenaRetreated('character')) {
+                        <span class="arena-retreated-badge">RETREATED</span>
+                      }
+                    </div>
+                    <div class="arena-content">
+                      @if (getOpponentTeamArenaOthers('character').length > 0) {
+                        <div class="others-section">
+                          @for (
+                            card of getOpponentTeamArenaOthers('character');
+                            track card.instanceId
+                          ) {
+                            <div
+                              class="game-card tiny sideways"
+                              [class.tapped]="card.isTapped"
+                              [class.owner-highlight]="card.ownerUserId && hasStack(card)"
+                              [attr.data-owner]="card.ownerUserId"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge tiny">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge tiny">{{ card.damage }}</div>
+                              }
+                              @if (card.ownerUserId) {
+                                <div class="owner-badge tiny">{{ card.ownerUserId.charAt(0) }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                      <div class="units-section">
+                        @for (
+                          card of getOpponentTeamArenaUnits('character');
+                          track card.instanceId
+                        ) {
+                          <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                            <!-- Pilot cards attached to this unit -->
+                            @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
+                              <div
+                                class="game-card small pilot-card"
+                                (dblclick)="zoomCard.set(pilotCard)"
+                              >
+                                <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
+                              </div>
+                            }
+                            <!-- Equipment card attached to this unit -->
+                            @if (getEquipmentCard(card); as equipCard) {
+                              <div
+                                class="game-card small equipment-card"
+                                (dblclick)="zoomCard.set(equipCard)"
+                              >
+                                <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                              </div>
+                            }
+                            <!-- Top card of the stack (rightmost due to row-reverse) -->
+                            <div
+                              class="game-card small stack-top"
+                              [class.tapped]="card.isTapped"
+                              [class.retreated]="card.isRetreated"
+                              [class.owner-highlight]="card.ownerUserId && (hasStack(card) || hasPilots(card) || hasEquipment(card))"
+                              [attr.data-owner]="card.ownerUserId"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.isTapped) {
+                                <div class="tapped-indicator small">TAP</div>
+                              }
+                              @if (card.isRetreated) {
+                                <div class="retreated-indicator small">RETREAT</div>
+                              }
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge small">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge small">{{ card.damage }}</div>
+                              }
+                              @if (card.version) {
+                                <div class="version-badge small">{{ card.version }}</div>
+                              }
+                              @if (hasStack(card)) {
+                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                              }
+                              @if (hasPilots(card)) {
+                                <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
+                              }
+                              @if (card.ownerUserId) {
+                                <div class="owner-badge small">{{ card.ownerUserId.charAt(0) }}</div>
+                              }
+                            </div>
+                            @for (
+                              stackedCard of getOpponentTeamStackedCards(card);
+                              track stackedCard.instanceId
+                            ) {
+                              <div
+                                class="game-card small stacked-card"
+                                [class.retreated]="stackedCard.isRetreated"
+                                (dblclick)="zoomCard.set(stackedCard)"
+                                (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                              >
+                                <img
+                                  [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="stackedCard.cardName"
+                                />
+                                @if (stackedCard.version) {
+                                  <div class="version-badge small">{{ stackedCard.version }}</div>
+                                }
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Ground Arena -->
+                  <div
+                    class="arena ground-arena opponent-arena"
+                    [class.arena-retreated]="isOpponentTeamArenaRetreated('ground')"
+                  >
+                    <div class="arena-label">
+                      GROUND
+                      @if (isOpponentTeamArenaRetreated('ground')) {
+                        <span class="arena-retreated-badge">RETREATED</span>
+                      }
+                    </div>
+                    <div class="arena-content">
+                      @if (getOpponentTeamArenaOthers('ground').length > 0) {
+                        <div class="others-section">
+                          @for (
+                            card of getOpponentTeamArenaOthers('ground');
+                            track card.instanceId
+                          ) {
+                            <div
+                              class="game-card tiny sideways"
+                              [class.tapped]="card.isTapped"
+                              [class.owner-highlight]="card.ownerUserId && hasStack(card)"
+                              [attr.data-owner]="card.ownerUserId"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge tiny">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge tiny">{{ card.damage }}</div>
+                              }
+                              @if (card.ownerUserId) {
+                                <div class="owner-badge tiny">{{ card.ownerUserId.charAt(0) }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                      <div class="units-section">
+                        @for (
+                          card of getOpponentTeamArenaUnits('ground');
+                          track card.instanceId
+                        ) {
+                          <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                            <!-- Pilot cards attached to this unit -->
+                            @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
+                              <div
+                                class="game-card small pilot-card"
+                                (dblclick)="zoomCard.set(pilotCard)"
+                              >
+                                <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
+                              </div>
+                            }
+                            <!-- Equipment card attached to this unit -->
+                            @if (getEquipmentCard(card); as equipCard) {
+                              <div
+                                class="game-card small equipment-card"
+                                (dblclick)="zoomCard.set(equipCard)"
+                              >
+                                <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                              </div>
+                            }
+                            <!-- Top card of the stack (rightmost due to row-reverse) -->
+                            <div
+                              class="game-card small stack-top"
+                              [class.tapped]="card.isTapped"
+                              [class.retreated]="card.isRetreated"
+                              [class.owner-highlight]="card.ownerUserId && (hasStack(card) || hasPilots(card) || hasEquipment(card))"
+                              [attr.data-owner]="card.ownerUserId"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.isTapped) {
+                                <div class="tapped-indicator small">TAP</div>
+                              }
+                              @if (card.isRetreated) {
+                                <div class="retreated-indicator small">RETREAT</div>
+                              }
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge small">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge small">{{ card.damage }}</div>
+                              }
+                              @if (card.version) {
+                                <div class="version-badge small">{{ card.version }}</div>
+                              }
+                              @if (hasStack(card)) {
+                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                              }
+                              @if (hasPilots(card)) {
+                                <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
+                              }
+                              @if (card.ownerUserId) {
+                                <div class="owner-badge small">{{ card.ownerUserId.charAt(0) }}</div>
+                              }
+                            </div>
+                            @for (
+                              stackedCard of getOpponentTeamStackedCards(card);
+                              track stackedCard.instanceId
+                            ) {
+                              <div
+                                class="game-card small stacked-card"
+                                [class.retreated]="stackedCard.isRetreated"
+                                (dblclick)="zoomCard.set(stackedCard)"
+                                (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                              >
+                                <img
+                                  [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="stackedCard.cardName"
+                                />
+                                @if (stackedCard.version) {
+                                  <div class="version-badge small">{{ stackedCard.version }}</div>
+                                }
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Space Arena -->
+                  <div
+                    class="arena space-arena opponent-arena"
+                    [class.arena-retreated]="isOpponentTeamArenaRetreated('space')"
+                  >
+                    <div class="arena-label">
+                      SPACE
+                      @if (isOpponentTeamArenaRetreated('space')) {
+                        <span class="arena-retreated-badge">RETREATED</span>
+                      }
+                    </div>
+                    <div class="arena-content">
+                      @if (getOpponentTeamArenaOthers('space').length > 0) {
+                        <div class="others-section">
+                          @for (
+                            card of getOpponentTeamArenaOthers('space');
+                            track card.instanceId
+                          ) {
+                            <div
+                              class="game-card tiny sideways"
+                              [class.tapped]="card.isTapped"
+                              [class.owner-highlight]="card.ownerUserId && hasStack(card)"
+                              [attr.data-owner]="card.ownerUserId"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge tiny">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge tiny">{{ card.damage }}</div>
+                              }
+                              @if (card.ownerUserId) {
+                                <div class="owner-badge tiny">{{ card.ownerUserId.charAt(0) }}</div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                      <div class="units-section">
+                        @for (
+                          card of getOpponentTeamArenaUnits('space');
+                          track card.instanceId
+                        ) {
+                          <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                            <!-- Pilot cards attached to this unit -->
+                            @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
+                              <div
+                                class="game-card small pilot-card"
+                                (dblclick)="zoomCard.set(pilotCard)"
+                              >
+                                <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
+                              </div>
+                            }
+                            <!-- Equipment card attached to this unit -->
+                            @if (getEquipmentCard(card); as equipCard) {
+                              <div
+                                class="game-card small equipment-card"
+                                (dblclick)="zoomCard.set(equipCard)"
+                              >
+                                <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                              </div>
+                            }
+                            <!-- Top card of the stack (rightmost due to row-reverse) -->
+                            <div
+                              class="game-card small stack-top"
+                              [class.tapped]="card.isTapped"
+                              [class.retreated]="card.isRetreated"
+                              [class.owner-highlight]="card.ownerUserId && (hasStack(card) || hasPilots(card) || hasEquipment(card))"
+                              [attr.data-owner]="card.ownerUserId"
+                              (dblclick)="zoomCard.set(card)"
+                              (contextmenu)="openOpponentCardMenu($event, card)"
+                            >
+                              <img
+                                [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                                [alt]="card.cardName"
+                              />
+                              @if (card.isTapped) {
+                                <div class="tapped-indicator small">TAP</div>
+                              }
+                              @if (card.isRetreated) {
+                                <div class="retreated-indicator small">RETREAT</div>
+                              }
+                              @if (card.counter !== null && card.counter !== undefined) {
+                                <div class="counter-badge small">{{ card.counter }}</div>
+                              }
+                              @if (card.damage !== null && card.damage !== undefined) {
+                                <div class="damage-badge small">{{ card.damage }}</div>
+                              }
+                              @if (card.version) {
+                                <div class="version-badge small">{{ card.version }}</div>
+                              }
+                              @if (hasStack(card)) {
+                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                              }
+                              @if (hasPilots(card)) {
+                                <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
+                              }
+                              @if (card.ownerUserId) {
+                                <div class="owner-badge small">{{ card.ownerUserId.charAt(0) }}</div>
+                              }
+                            </div>
+                            @for (
+                              stackedCard of getOpponentTeamStackedCards(card);
+                              track stackedCard.instanceId
+                            ) {
+                              <div
+                                class="game-card small stacked-card"
+                                [class.retreated]="stackedCard.isRetreated"
+                                (dblclick)="zoomCard.set(stackedCard)"
+                                (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                              >
+                                <img
+                                  [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="stackedCard.cardName"
+                                />
+                                @if (stackedCard.version) {
+                                  <div class="version-badge small">{{ stackedCard.version }}</div>
+                                }
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  </div>
+            } @else {
+            <!-- 1v1 Mode: Per-player arenas -->
             @for (opponent of opponents(); track opponent.username) {
               <!-- Opponent Character Arena -->
               <div
@@ -160,6 +589,7 @@
                               <div
                                 class="game-card small stack-top"
                                 [class.tapped]="card.isTapped"
+                                [class.retreated]="card.isRetreated"
                                 (dblclick)="zoomCard.set(card)"
                                 (contextmenu)="openOpponentCardMenu($event, card)"
                               >
@@ -169,6 +599,9 @@
                                 />
                                 @if (card.isTapped) {
                                   <div class="tapped-indicator small">TAP</div>
+                                }
+                                @if (card.isRetreated) {
+                                  <div class="retreated-indicator small">RETREAT</div>
                                 }
                                 @if (card.counter !== null && card.counter !== undefined) {
                                   <div class="counter-badge small">{{ card.counter }}</div>
@@ -186,6 +619,7 @@
                               ) {
                                 <div
                                   class="game-card small stacked-card"
+                                  [class.retreated]="stackedCard.isRetreated"
                                   (dblclick)="zoomCard.set(stackedCard)"
                                   (contextmenu)="openOpponentCardMenu($event, stackedCard)"
                                 >
@@ -203,6 +637,7 @@
                             <div
                               class="game-card small"
                               [class.tapped]="card.isTapped"
+                              [class.retreated]="card.isRetreated"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
                             >
@@ -212,6 +647,9 @@
                               />
                               @if (card.isTapped) {
                                 <div class="tapped-indicator small">TAP</div>
+                              }
+                              @if (card.isRetreated) {
+                                <div class="retreated-indicator small">RETREAT</div>
                               }
                               @if (card.counter !== null && card.counter !== undefined) {
                                 <div class="counter-badge small">{{ card.counter }}</div>
@@ -271,54 +709,30 @@
                           card of getPlayerArenaUnits(opponent, 'ground');
                           track card.instanceId
                         ) {
-                          @if (hasStack(card)) {
-                            <div class="card-stack small">
+                          <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                            <!-- Pilot cards attached to this unit -->
+                            @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
                               <div
-                                class="game-card small stack-top"
-                                [class.tapped]="card.isTapped"
-                                (dblclick)="zoomCard.set(card)"
-                                (contextmenu)="openOpponentCardMenu($event, card)"
+                                class="game-card small pilot-card"
+                                (dblclick)="zoomCard.set(pilotCard)"
                               >
-                                <img
-                                  [src]="card.cardImageUrl || 'assets/card-back.jpg'"
-                                  [alt]="card.cardName"
-                                />
-                                @if (card.isTapped) {
-                                  <div class="tapped-indicator small">TAP</div>
-                                }
-                                @if (card.counter !== null && card.counter !== undefined) {
-                                  <div class="counter-badge small">{{ card.counter }}</div>
-                                }
-                                @if (card.damage !== null && card.damage !== undefined) {
-                                  <div class="damage-badge small">{{ card.damage }}</div>
-                                }
-                                @if (card.version) {
-                                  <div class="version-badge small">{{ card.version }}</div>
-                                }
+                                <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
-                              @for (
-                                stackedCard of getStackedCards(opponent, card);
-                                track stackedCard.instanceId
-                              ) {
-                                <div
-                                  class="game-card small stacked-card"
-                                  (dblclick)="zoomCard.set(stackedCard)"
-                                  (contextmenu)="openOpponentCardMenu($event, stackedCard)"
-                                >
-                                  <img
-                                    [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
-                                    [alt]="stackedCard.cardName"
-                                  />
-                                  @if (stackedCard.version) {
-                                    <div class="version-badge small">{{ stackedCard.version }}</div>
-                                  }
-                                </div>
-                              }
-                            </div>
-                          } @else {
+                            }
+                            <!-- Equipment card attached to this unit -->
+                            @if (getEquipmentCard(card); as equipCard) {
+                              <div
+                                class="game-card small equipment-card"
+                                (dblclick)="zoomCard.set(equipCard)"
+                              >
+                                <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                              </div>
+                            }
+                            <!-- Top card -->
                             <div
-                              class="game-card small"
+                              class="game-card small stack-top"
                               [class.tapped]="card.isTapped"
+                              [class.retreated]="card.isRetreated"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
                             >
@@ -329,6 +743,9 @@
                               @if (card.isTapped) {
                                 <div class="tapped-indicator small">TAP</div>
                               }
+                              @if (card.isRetreated) {
+                                <div class="retreated-indicator small">RETREAT</div>
+                              }
                               @if (card.counter !== null && card.counter !== undefined) {
                                 <div class="counter-badge small">{{ card.counter }}</div>
                               }
@@ -338,8 +755,33 @@
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
                               }
+                              @if (hasStack(card)) {
+                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                              }
+                              @if (hasPilots(card)) {
+                                <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
+                              }
                             </div>
-                          }
+                            @for (
+                              stackedCard of getStackedCards(opponent, card);
+                              track stackedCard.instanceId
+                            ) {
+                              <div
+                                class="game-card small stacked-card"
+                                [class.retreated]="stackedCard.isRetreated"
+                                (dblclick)="zoomCard.set(stackedCard)"
+                                (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                              >
+                                <img
+                                  [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="stackedCard.cardName"
+                                />
+                                @if (stackedCard.version) {
+                                  <div class="version-badge small">{{ stackedCard.version }}</div>
+                                }
+                              </div>
+                            }
+                          </div>
                         }
                       </div>
                     </div>
@@ -387,54 +829,30 @@
                           card of getPlayerArenaUnits(opponent, 'space');
                           track card.instanceId
                         ) {
-                          @if (hasStack(card)) {
-                            <div class="card-stack small">
+                          <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                            <!-- Pilot cards attached to this unit -->
+                            @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
                               <div
-                                class="game-card small stack-top"
-                                [class.tapped]="card.isTapped"
-                                (dblclick)="zoomCard.set(card)"
-                                (contextmenu)="openOpponentCardMenu($event, card)"
+                                class="game-card small pilot-card"
+                                (dblclick)="zoomCard.set(pilotCard)"
                               >
-                                <img
-                                  [src]="card.cardImageUrl || 'assets/card-back.jpg'"
-                                  [alt]="card.cardName"
-                                />
-                                @if (card.isTapped) {
-                                  <div class="tapped-indicator small">TAP</div>
-                                }
-                                @if (card.counter !== null && card.counter !== undefined) {
-                                  <div class="counter-badge small">{{ card.counter }}</div>
-                                }
-                                @if (card.damage !== null && card.damage !== undefined) {
-                                  <div class="damage-badge small">{{ card.damage }}</div>
-                                }
-                                @if (card.version) {
-                                  <div class="version-badge small">{{ card.version }}</div>
-                                }
+                                <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
-                              @for (
-                                stackedCard of getStackedCards(opponent, card);
-                                track stackedCard.instanceId
-                              ) {
-                                <div
-                                  class="game-card small stacked-card"
-                                  (dblclick)="zoomCard.set(stackedCard)"
-                                  (contextmenu)="openOpponentCardMenu($event, stackedCard)"
-                                >
-                                  <img
-                                    [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
-                                    [alt]="stackedCard.cardName"
-                                  />
-                                  @if (stackedCard.version) {
-                                    <div class="version-badge small">{{ stackedCard.version }}</div>
-                                  }
-                                </div>
-                              }
-                            </div>
-                          } @else {
+                            }
+                            <!-- Equipment card attached to this unit -->
+                            @if (getEquipmentCard(card); as equipCard) {
+                              <div
+                                class="game-card small equipment-card"
+                                (dblclick)="zoomCard.set(equipCard)"
+                              >
+                                <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                              </div>
+                            }
+                            <!-- Top card -->
                             <div
-                              class="game-card small"
+                              class="game-card small stack-top"
                               [class.tapped]="card.isTapped"
+                              [class.retreated]="card.isRetreated"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
                             >
@@ -445,6 +863,9 @@
                               @if (card.isTapped) {
                                 <div class="tapped-indicator small">TAP</div>
                               }
+                              @if (card.isRetreated) {
+                                <div class="retreated-indicator small">RETREAT</div>
+                              }
                               @if (card.counter !== null && card.counter !== undefined) {
                                 <div class="counter-badge small">{{ card.counter }}</div>
                               }
@@ -454,12 +875,38 @@
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
                               }
+                              @if (hasStack(card)) {
+                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                              }
+                              @if (hasPilots(card)) {
+                                <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
+                              }
                             </div>
-                          }
+                            @for (
+                              stackedCard of getStackedCards(opponent, card);
+                              track stackedCard.instanceId
+                            ) {
+                              <div
+                                class="game-card small stacked-card"
+                                [class.retreated]="stackedCard.isRetreated"
+                                (dblclick)="zoomCard.set(stackedCard)"
+                                (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                              >
+                                <img
+                                  [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="stackedCard.cardName"
+                                />
+                                @if (stackedCard.version) {
+                                  <div class="version-badge small">{{ stackedCard.version }}</div>
+                                }
+                              </div>
+                            }
+                          </div>
                         }
                       </div>
                     </div>
                   </div>
+            }
             }
           </div>
 
@@ -471,7 +918,7 @@
               (dragover)="onDragOver($event)"
               (drop)="onDrop($event, 'character')"
               [class.drag-over]="dragOverZone() === 'character'"
-              [class.arena-retreated]="myPlayer()?.characterArenaRetreated"
+              [class.arena-retreated]="isMyArenaRetreated('character')"
             >
               <div class="arena-label">
                     CHARACTER
@@ -479,7 +926,7 @@
                       class="btn btn-xs btn-outline-warning arena-retreat-btn"
                       (click)="toggleArenaRetreat('character'); $event.stopPropagation()"
                     >
-                      {{ myPlayer()?.characterArenaRetreated ? 'Un-retreat' : 'Retreat' }}
+                      {{ isMyArenaRetreated('character') ? 'Un-retreat' : 'Retreat' }}
                     </button>
                   </div>
                   <div class="arena-content">
@@ -492,12 +939,14 @@
                             [class.face-down]="card.isFaceDown"
                             [class.retreated]="card.isRetreated"
                             [class.selected]="selectedCard() === card.instanceId"
-                            draggable="true"
-                            (dragstart)="onDragStart($event, card, 'character')"
+                            [class.owner-highlight]="isTeamMode() && card.ownerUserId && hasStack(card)"
+                            [attr.data-owner]="card.ownerUserId"
+                            [attr.draggable]="isCardOwner(card)"
+                            (dragstart)="isCardOwner(card) ? onDragStart($event, card, 'character') : $event.preventDefault()"
                             (dragend)="onDragEnd()"
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
-                            (contextmenu)="openCardMenu($event, card)"
+                            (contextmenu)="isCardOwner(card) ? openCardMenu($event, card) : openOpponentCardMenu($event, card)"
                           >
                             <img
                               [src]="
@@ -521,24 +970,49 @@
                       </div>
                     }
                     <div class="units-section">
-                      @for (card of myArenaUnits('character'); track card.instanceId) {
-                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)">
+                      @for (card of myArenaUnitsOrdered('character'); track card.instanceId) {
+                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                          <!-- Pilot cards attached to this unit -->
+                          @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
+                            <div
+                              class="game-card small pilot-card"
+                              (dblclick)="zoomCard.set(pilotCard)"
+                              (contextmenu)="openPilotCardMenu($event, pilotCard, card)"
+                            >
+                              <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
+                            </div>
+                          }
+                          <!-- Equipment card attached to this unit -->
+                          @if (getEquipmentCard(card); as equipCard) {
+                            <div
+                              class="game-card small equipment-card"
+                              (dblclick)="zoomCard.set(equipCard)"
+                              (contextmenu)="openEquipmentCardMenu($event, equipCard, card)"
+                            >
+                              <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                            </div>
+                          }
                           <!-- Top card of the stack (rightmost due to row-reverse) -->
                           <div
                             class="game-card small stack-top"
+                            [attr.data-instanceid]="card.instanceId"
                             [class.tapped]="card.isTapped"
                             [class.face-down]="card.isFaceDown"
                             [class.retreated]="card.isRetreated"
                             [class.selected]="selectedCard() === card.instanceId"
-                            draggable="true"
-                            (dragstart)="onDragStart($event, card, 'character')"
+                            [attr.draggable]="isCardOwner(card)"
+                            (dragstart)="isCardOwner(card) ? onDragStart($event, card, 'character') : $event.preventDefault()"
                             (dragend)="onDragEnd()"
+                            (dragover)="$event.preventDefault()"
+                            (drop)="onDrop($event, 'character')"
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
                             (contextmenu)="
-                              hasStack(card)
-                                ? openStackMenu($event, card)
-                                : openCardMenu($event, card)
+                              isCardOwner(card)
+                                ? (hasStack(card)
+                                    ? openStackMenu($event, card)
+                                    : openCardMenu($event, card))
+                                : openOpponentCardMenu($event, card)
                             "
                           >
                             <img
@@ -606,7 +1080,7 @@
                   (dragover)="onDragOver($event)"
                   (drop)="onDrop($event, 'ground')"
                   [class.drag-over]="dragOverZone() === 'ground'"
-                  [class.arena-retreated]="myPlayer()?.groundArenaRetreated"
+                  [class.arena-retreated]="isMyArenaRetreated('ground')"
                 >
                   <div class="arena-label">
                     GROUND
@@ -614,7 +1088,7 @@
                       class="btn btn-xs btn-outline-warning arena-retreat-btn"
                       (click)="toggleArenaRetreat('ground'); $event.stopPropagation()"
                     >
-                      {{ myPlayer()?.groundArenaRetreated ? 'Un-retreat' : 'Retreat' }}
+                      {{ isMyArenaRetreated('ground') ? 'Un-retreat' : 'Retreat' }}
                     </button>
                   </div>
                   <div class="arena-content">
@@ -627,12 +1101,14 @@
                             [class.face-down]="card.isFaceDown"
                             [class.retreated]="card.isRetreated"
                             [class.selected]="selectedCard() === card.instanceId"
-                            draggable="true"
-                            (dragstart)="onDragStart($event, card, 'ground')"
+                            [class.owner-highlight]="isTeamMode() && card.ownerUserId && hasStack(card)"
+                            [attr.data-owner]="card.ownerUserId"
+                            [attr.draggable]="isCardOwner(card)"
+                            (dragstart)="isCardOwner(card) ? onDragStart($event, card, 'ground') : $event.preventDefault()"
                             (dragend)="onDragEnd()"
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
-                            (contextmenu)="openCardMenu($event, card)"
+                            (contextmenu)="isCardOwner(card) ? openCardMenu($event, card) : openOpponentCardMenu($event, card)"
                           >
                             <img
                               [src]="
@@ -656,24 +1132,49 @@
                       </div>
                     }
                     <div class="units-section">
-                      @for (card of myArenaUnits('ground'); track card.instanceId) {
-                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)">
+                      @for (card of myArenaUnitsOrdered('ground'); track card.instanceId) {
+                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                          <!-- Pilot cards attached to this unit -->
+                          @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
+                            <div
+                              class="game-card small pilot-card"
+                              (dblclick)="zoomCard.set(pilotCard)"
+                              (contextmenu)="openPilotCardMenu($event, pilotCard, card)"
+                            >
+                              <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
+                            </div>
+                          }
+                          <!-- Equipment card attached to this unit -->
+                          @if (getEquipmentCard(card); as equipCard) {
+                            <div
+                              class="game-card small equipment-card"
+                              (dblclick)="zoomCard.set(equipCard)"
+                              (contextmenu)="openEquipmentCardMenu($event, equipCard, card)"
+                            >
+                              <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                            </div>
+                          }
                           <!-- Top card of the stack (rightmost due to row-reverse) -->
                           <div
                             class="game-card small stack-top"
+                            [attr.data-instanceid]="card.instanceId"
                             [class.tapped]="card.isTapped"
                             [class.face-down]="card.isFaceDown"
                             [class.retreated]="card.isRetreated"
                             [class.selected]="selectedCard() === card.instanceId"
-                            draggable="true"
-                            (dragstart)="onDragStart($event, card, 'ground')"
+                            [attr.draggable]="isCardOwner(card)"
+                            (dragstart)="isCardOwner(card) ? onDragStart($event, card, 'ground') : $event.preventDefault()"
                             (dragend)="onDragEnd()"
+                            (dragover)="$event.preventDefault()"
+                            (drop)="onDrop($event, 'ground')"
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
                             (contextmenu)="
-                              hasStack(card)
-                                ? openStackMenu($event, card)
-                                : openCardMenu($event, card)
+                              isCardOwner(card)
+                                ? (hasStack(card)
+                                    ? openStackMenu($event, card)
+                                    : openCardMenu($event, card))
+                                : openOpponentCardMenu($event, card)
                             "
                           >
                             <img
@@ -701,6 +1202,9 @@
                             }
                             @if (hasStack(card)) {
                               <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                            }
+                            @if (hasPilots(card)) {
+                              <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
                             }
                             @if (card.version && !card.isFaceDown) {
                               <div class="version-badge small">{{ card.version }}</div>
@@ -741,7 +1245,7 @@
                   (dragover)="onDragOver($event)"
                   (drop)="onDrop($event, 'space')"
                   [class.drag-over]="dragOverZone() === 'space'"
-                  [class.arena-retreated]="myPlayer()?.spaceArenaRetreated"
+                  [class.arena-retreated]="isMyArenaRetreated('space')"
                 >
                   <div class="arena-label">
                     SPACE
@@ -749,7 +1253,7 @@
                       class="btn btn-xs btn-outline-warning arena-retreat-btn"
                       (click)="toggleArenaRetreat('space'); $event.stopPropagation()"
                     >
-                      {{ myPlayer()?.spaceArenaRetreated ? 'Un-retreat' : 'Retreat' }}
+                      {{ isMyArenaRetreated('space') ? 'Un-retreat' : 'Retreat' }}
                     </button>
                   </div>
                   <div class="arena-content">
@@ -762,12 +1266,14 @@
                             [class.face-down]="card.isFaceDown"
                             [class.retreated]="card.isRetreated"
                             [class.selected]="selectedCard() === card.instanceId"
-                            draggable="true"
-                            (dragstart)="onDragStart($event, card, 'space')"
+                            [class.owner-highlight]="isTeamMode() && card.ownerUserId && hasStack(card)"
+                            [attr.data-owner]="card.ownerUserId"
+                            [attr.draggable]="isCardOwner(card)"
+                            (dragstart)="isCardOwner(card) ? onDragStart($event, card, 'space') : $event.preventDefault()"
                             (dragend)="onDragEnd()"
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
-                            (contextmenu)="openCardMenu($event, card)"
+                            (contextmenu)="isCardOwner(card) ? openCardMenu($event, card) : openOpponentCardMenu($event, card)"
                           >
                             <img
                               [src]="
@@ -791,24 +1297,49 @@
                       </div>
                     }
                     <div class="units-section">
-                      @for (card of myArenaUnits('space'); track card.instanceId) {
-                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)">
+                      @for (card of myArenaUnitsOrdered('space'); track card.instanceId) {
+                        <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                          <!-- Pilot cards attached to this unit -->
+                          @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
+                            <div
+                              class="game-card small pilot-card"
+                              (dblclick)="zoomCard.set(pilotCard)"
+                              (contextmenu)="openPilotCardMenu($event, pilotCard, card)"
+                            >
+                              <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
+                            </div>
+                          }
+                          <!-- Equipment card attached to this unit -->
+                          @if (getEquipmentCard(card); as equipCard) {
+                            <div
+                              class="game-card small equipment-card"
+                              (dblclick)="zoomCard.set(equipCard)"
+                              (contextmenu)="openEquipmentCardMenu($event, equipCard, card)"
+                            >
+                              <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                            </div>
+                          }
                           <!-- Top card of the stack (rightmost due to row-reverse) -->
                           <div
                             class="game-card small stack-top"
+                            [attr.data-instanceid]="card.instanceId"
                             [class.tapped]="card.isTapped"
                             [class.face-down]="card.isFaceDown"
                             [class.retreated]="card.isRetreated"
                             [class.selected]="selectedCard() === card.instanceId"
-                            draggable="true"
-                            (dragstart)="onDragStart($event, card, 'space')"
+                            [attr.draggable]="isCardOwner(card)"
+                            (dragstart)="isCardOwner(card) ? onDragStart($event, card, 'space') : $event.preventDefault()"
                             (dragend)="onDragEnd()"
+                            (dragover)="$event.preventDefault()"
+                            (drop)="onDrop($event, 'space')"
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
                             (contextmenu)="
-                              hasStack(card)
-                                ? openStackMenu($event, card)
-                                : openCardMenu($event, card)
+                              isCardOwner(card)
+                                ? (hasStack(card)
+                                    ? openStackMenu($event, card)
+                                    : openCardMenu($event, card))
+                                : openOpponentCardMenu($event, card)
                             "
                           >
                             <img
@@ -836,6 +1367,9 @@
                             }
                             @if (hasStack(card)) {
                               <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                            }
+                            @if (hasPilots(card)) {
+                              <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
                             }
                             @if (card.version && !card.isFaceDown) {
                               <div class="version-badge small">{{ card.version }}</div>
@@ -892,7 +1426,7 @@
                 <input
                   type="number"
                   class="force-input"
-                  [value]="myPlayer()?.force ?? 4"
+                  [value]="myTeamForce()"
                   (change)="onForceChange($event)"
                   min="0"
                   max="99"
@@ -905,7 +1439,7 @@
                 <input
                   type="number"
                   class="force-input build-input"
-                  [value]="myPlayer()?.buildCounter ?? 60"
+                  [value]="myTeamBuildCounter()"
                   (change)="onBuildChange($event)"
                   min="0"
                   max="99"
@@ -969,13 +1503,13 @@
               </button>
             </div>
             <div class="hand-cards">
-              @for (card of myHand(); track card.instanceId) {
+              @for (card of myHandSorted(); track card.instanceId) {
                 <div
                   class="game-card hand-card"
                   [class.sideways]="card.cardType !== 0"
                   [class.selected]="selectedCard() === card.instanceId"
-                  draggable="true"
-                  (dragstart)="onDragStart($event, card, 'hand')"
+                  [attr.draggable]="card.cardType !== 2"
+                  (dragstart)="card.cardType !== 2 ? onDragStart($event, card, 'hand') : $event.preventDefault()"
                   (dragend)="onDragEnd()"
                   (click)="selectCard(card.instanceId)"
                   (dblclick)="zoomCard.set(card)"
@@ -1063,10 +1597,11 @@
                     class="game-card"
                     [class.sideways]="card.cardType !== 0"
                     [class.has-counter]="card.counter !== null && card.counter !== undefined"
-                    draggable="true"
-                    (dragstart)="onDragStart($event, card, 'build')"
+                    [attr.draggable]="isCardOwner(card)"
+                    (dragstart)="isCardOwner(card) ? onDragStart($event, card, 'build') : $event.preventDefault()"
                     (dragend)="onDragEnd()"
-                    (contextmenu)="openBuildCardMenu($event, card)"
+                    (dblclick)="zoomCard.set(card)"
+                    (contextmenu)="isCardOwner(card) ? openBuildCardMenu($event, card) : openOpponentCardMenu($event, card)"
                   >
                     <img
                       [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -1078,6 +1613,12 @@
                     }
                     @if (card.counter !== null && card.counter !== undefined) {
                       <div class="counter-badge">{{ card.counter }}</div>
+                    }
+                    <div class="arena-indicator" [class]="getArenaIndicatorClass(card)">
+                      {{ getArenaIndicatorText(card) }}
+                    </div>
+                    @if (isTeamMode() && card.ownerUserId && !isCardOwner(card)) {
+                      <div class="owner-badge">{{ card.ownerUserId.charAt(0) }}</div>
                     }
                   </div>
                 } @empty {
@@ -1157,6 +1698,9 @@
                 }
               </div>
               <hr class="context-menu-divider" />
+              <button class="context-menu-item" (click)="toggleCardRetreatFromMenu()">
+                {{ cardMenuCard()!.isRetreated ? 'Un-retreat' : 'Retreat' }}
+              </button>
               <button class="context-menu-item" (click)="moveToBuildFromMenu()">
                 Move to Build
               </button>
@@ -1164,6 +1708,30 @@
               <button class="context-menu-item" (click)="returnToHandFromMenu()">
                 Return to Hand
               </button>
+              <!-- Pilot cards in Character arena can be attached to units in Space/Ground -->
+              @if (cardMenuCard()!.isPilot && cardMenuCard()!.cardArena?.toLowerCase() === 'character') {
+                <hr class="context-menu-divider" />
+                <button class="context-menu-item" (click)="openPilotModal(cardMenuCard()!)">
+                  Attach as Pilot...
+                </button>
+              }
+              <!-- Pilot detach options -->
+              @if (hasPilots(cardMenuCard()!)) {
+                <hr class="context-menu-divider" />
+                <div class="context-menu-label">Detach Pilot:</div>
+                @for (pilotCard of getPilotCards(cardMenuCard()!); track pilotCard.instanceId) {
+                  <button class="context-menu-item" (click)="detachPilotFromMenu(pilotCard)">
+                    {{ pilotCard.cardName }}
+                  </button>
+                }
+              }
+              <!-- Equipment detach option -->
+              @if (hasEquipment(cardMenuCard()!)) {
+                <hr class="context-menu-divider" />
+                <button class="context-menu-item" (click)="detachEquipmentFromMenu()">
+                  Detach Equipment
+                </button>
+              }
             </div>
           </div>
           <div class="context-menu-backdrop" (click)="closeCardMenu()"></div>
@@ -1210,48 +1778,68 @@
             (click)="$event.stopPropagation()"
           >
             <div class="context-menu-content">
-              <div class="context-menu-label">Play to:</div>
-              <!-- For Unit cards with a designated arena, show only that arena -->
-              @if (handCardMenuCard()!.cardType === 0 && handCardMenuCard()!.cardArena) {
-                <button
-                  class="context-menu-item"
-                  (click)="playToArena(handCardMenuCard()!.cardArena!.toLowerCase())"
-                >
-                  {{ handCardMenuCard()!.cardArena | titlecase }} Arena
-                </button>
-              } @else {
-                <!-- For non-unit cards or units without designated arena, show all options -->
-                <button class="context-menu-item" (click)="playToArena('space')">
-                  Space Arena
-                </button>
-                <button class="context-menu-item" (click)="playToArena('ground')">
-                  Ground Arena
-                </button>
+              <!-- Pilot cards: Can play to Character arena OR attach to Space/Ground units -->
+              @if (handCardMenuCard()!.isPilot) {
+                <div class="context-menu-label">Play to:</div>
                 <button class="context-menu-item" (click)="playToArena('character')">
                   Character Arena
                 </button>
-              }
-              <hr class="context-menu-divider" />
-              <!-- Stack onto existing card option (for versioned units) -->
-              @if (handCardMenuCard()!.version && handCardMenuCard()!.cardType === 0) {
-                <div class="context-menu-label">Stack onto (same name, diff version):</div>
-                @for (target of stackableTargets(); track target.instanceId) {
+                <hr class="context-menu-divider" />
+                <button class="context-menu-item" (click)="openPilotModal(handCardMenuCard()!)">
+                  Attach as Pilot...
+                </button>
+                <hr class="context-menu-divider" />
+              } @else if (handCardMenuCard()!.cardType === 2) {
+                <!-- Equipment cards can ONLY be attached to units via modal -->
+                <button class="context-menu-item" (click)="openEquipmentModal(handCardMenuCard()!)">
+                  Equip to Unit...
+                </button>
+                <hr class="context-menu-divider" />
+              } @else {
+                <!-- Regular cards can be played to arenas -->
+                <div class="context-menu-label">Play to:</div>
+                <!-- For Unit cards with a designated arena, show only that arena -->
+                @if (handCardMenuCard()!.cardType === 0 && handCardMenuCard()!.cardArena) {
                   <button
                     class="context-menu-item"
-                    (click)="stackCardOnTarget(handCardMenuCard()!.instanceId, target.instanceId)"
+                    (click)="playToArena(handCardMenuCard()!.cardArena!.toLowerCase())"
                   >
-                    {{ target.cardName }} ({{ target.version }}) - {{ target.cardArena }}
+                    {{ handCardMenuCard()!.cardArena | titlecase }} Arena
+                  </button>
+                } @else {
+                  <!-- For non-unit cards or units without designated arena, show all options -->
+                  <button class="context-menu-item" (click)="playToArena('space')">
+                    Space Arena
+                  </button>
+                  <button class="context-menu-item" (click)="playToArena('ground')">
+                    Ground Arena
+                  </button>
+                  <button class="context-menu-item" (click)="playToArena('character')">
+                    Character Arena
                   </button>
                 }
-                @if (stackableTargets().length === 0) {
-                  <span
-                    class="context-menu-item"
-                    style="color: rgba(255, 255, 255, 0.5); cursor: default"
-                  >
-                    No stackable targets in arena
-                  </span>
-                }
                 <hr class="context-menu-divider" />
+                <!-- Stack onto existing card option (for versioned units) -->
+                @if (handCardMenuCard()!.version && handCardMenuCard()!.cardType === 0) {
+                  <div class="context-menu-label">Stack onto (same name, diff version):</div>
+                  @for (target of stackableTargets(); track target.instanceId) {
+                    <button
+                      class="context-menu-item"
+                      (click)="stackCardOnTarget(handCardMenuCard()!.instanceId, target.instanceId)"
+                    >
+                      {{ target.cardName }} ({{ target.version }}) - {{ target.cardArena }}
+                    </button>
+                  }
+                  @if (stackableTargets().length === 0) {
+                    <span
+                      class="context-menu-item"
+                      style="color: rgba(255, 255, 255, 0.5); cursor: default"
+                    >
+                      No stackable targets in arena
+                    </span>
+                  }
+                  <hr class="context-menu-divider" />
+                }
               }
               <button class="context-menu-item" (click)="moveToBuildFromHandMenu()">
                 Move to Build Zone
@@ -1340,34 +1928,148 @@
                 }
               </div>
               <hr class="context-menu-divider" />
-              <div class="context-menu-label">Play to Arena:</div>
-              <!-- For Unit cards with a designated arena, show only that arena -->
-              @if (buildCardMenuCard()!.cardType === 0 && buildCardMenuCard()!.cardArena) {
-                <button
-                  class="context-menu-item"
-                  (click)="moveFromBuildTo(buildCardMenuCard()!.cardArena!.toLowerCase())"
-                >
-                  {{ buildCardMenuCard()!.cardArena | titlecase }} Arena
-                </button>
-              } @else {
-                <!-- For non-unit cards or units without designated arena, show all options -->
-                <button class="context-menu-item" (click)="moveFromBuildTo('space')">
-                  Space Arena
-                </button>
-                <button class="context-menu-item" (click)="moveFromBuildTo('ground')">
-                  Ground Arena
-                </button>
+              <!-- Pilot cards: Can play to Character arena OR attach to Space/Ground units -->
+              @if (buildCardMenuCard()!.isPilot) {
+                <div class="context-menu-label">Play to Arena:</div>
                 <button class="context-menu-item" (click)="moveFromBuildTo('character')">
                   Character Arena
                 </button>
+                <hr class="context-menu-divider" />
+                <button class="context-menu-item" (click)="openPilotModal(buildCardMenuCard()!)">
+                  Attach as Pilot...
+                </button>
+              } @else if (buildCardMenuCard()!.cardType === 2) {
+                <!-- Equipment cards can ONLY be attached to units via modal -->
+                <button class="context-menu-item" (click)="openEquipmentModal(buildCardMenuCard()!)">
+                  Equip to Unit...
+                </button>
+              } @else {
+                <!-- Regular cards can be played to arenas -->
+                <div class="context-menu-label">Play to Arena:</div>
+                <!-- For Unit cards with a designated arena, show only that arena -->
+                @if (buildCardMenuCard()!.cardType === 0 && buildCardMenuCard()!.cardArena) {
+                  <button
+                    class="context-menu-item"
+                    (click)="moveFromBuildTo(buildCardMenuCard()!.cardArena!.toLowerCase())"
+                  >
+                    {{ buildCardMenuCard()!.cardArena | titlecase }} Arena
+                  </button>
+                } @else {
+                  <!-- For non-unit cards or units without designated arena, show all options -->
+                  <button class="context-menu-item" (click)="moveFromBuildTo('space')">
+                    Space Arena
+                  </button>
+                  <button class="context-menu-item" (click)="moveFromBuildTo('ground')">
+                    Ground Arena
+                  </button>
+                  <button class="context-menu-item" (click)="moveFromBuildTo('character')">
+                    Character Arena
+                  </button>
+                }
               }
             </div>
           </div>
           <div class="context-menu-backdrop" (click)="closeBuildCardMenu()"></div>
         }
 
-        <!-- Opponent Build Zone Modal -->
-        @if (showOpponentBuildZone()) {
+        <!-- Pilot Card Context Menu (for pilots attached to units) -->
+        @if (pilotMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="pilotMenuX()"
+            [style.top.px]="pilotMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <button class="context-menu-item" (click)="zoomPilotFromPilotMenu()">Zoom Pilot</button>
+              <button class="context-menu-item" (click)="zoomUnitFromPilotMenu()">Zoom Unit</button>
+              <hr class="context-menu-divider" />
+              <button class="context-menu-item" (click)="detachPilotFromPilotMenu()">Remove Pilot</button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closePilotMenu()"></div>
+        }
+
+        <!-- Equipment Card Context Menu (for equipment attached to units) -->
+        @if (equipmentMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="equipmentMenuX()"
+            [style.top.px]="equipmentMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <button class="context-menu-item" (click)="zoomEquipmentFromMenu()">Zoom Equipment</button>
+              <button class="context-menu-item" (click)="zoomUnitFromEquipmentMenu()">Zoom Unit</button>
+              <hr class="context-menu-divider" />
+              <button class="context-menu-item" (click)="moveEquipmentToHandFromMenu()">Move to Hand</button>
+              <button class="context-menu-item" (click)="discardEquipmentFromMenu()">Discard</button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeEquipmentMenu()"></div>
+        }
+
+        <!-- Pilot Selection Modal -->
+        @if (showPilotModal() && pilotModalCard()) {
+          <div class="modal-overlay" (click)="closePilotModal()">
+            <div class="modal-content pilot-modal" (click)="$event.stopPropagation()">
+              <h4>Select Unit to Pilot</h4>
+              <p class="pilot-modal-subtitle">Attaching {{ pilotModalCard()!.cardName }}</p>
+              <div class="pilot-targets-list">
+                @for (target of getPilotableTargets(); track target.instanceId) {
+                  <button class="pilot-target-option" (click)="pilotUnitFromModal(target)">
+                    <img
+                      [src]="target.cardImageUrl || 'assets/card-back.jpg'"
+                      [alt]="target.cardName"
+                    />
+                    <div class="target-info">
+                      <div class="target-name">{{ target.cardName }}</div>
+                      <div class="target-arena">{{ target.cardArena | titlecase }} Arena</div>
+                      @if (target.pilotCardIds.length > 0) {
+                        <div class="target-pilots">{{ target.pilotCardIds.length }}/2 pilots</div>
+                      }
+                    </div>
+                  </button>
+                }
+                @if (getPilotableTargets().length === 0) {
+                  <p class="no-targets">No pilotable units in Space or Ground arenas</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="closePilotModal()">Cancel</button>
+            </div>
+          </div>
+        }
+
+        <!-- Equipment Selection Modal -->
+        @if (showEquipmentModal() && equipmentModalCard()) {
+          <div class="modal-overlay" (click)="closeEquipmentModal()">
+            <div class="modal-content equipment-modal" (click)="$event.stopPropagation()">
+              <h4>Select Unit to Equip</h4>
+              <p class="equipment-modal-subtitle">Equipping {{ equipmentModalCard()!.cardName }}</p>
+              <div class="equipment-targets-list">
+                @for (target of getEquippableTargets(equipmentModalCard()!); track target.instanceId) {
+                  <button class="equipment-target-option" (click)="equipUnitFromModal(target)">
+                    <img
+                      [src]="target.cardImageUrl || 'assets/card-back.jpg'"
+                      [alt]="target.cardName"
+                    />
+                    <div class="target-info">
+                      <div class="target-name">{{ target.cardName }}</div>
+                      <div class="target-arena">{{ target.cardArena | titlecase }} Arena</div>
+                    </div>
+                  </button>
+                }
+                @if (getEquippableTargets(equipmentModalCard()!).length === 0) {
+                  <p class="no-targets">No equippable units available</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="closeEquipmentModal()">Cancel</button>
+            </div>
+          </div>
+        }
+
+        <!-- Opponent Build Zone Modal (1v1 mode) -->
+        @if (showOpponentBuildZone() && !isTeamMode()) {
           <div class="modal-overlay" (click)="showOpponentBuildZone.set(null)">
             <div class="modal-content" (click)="$event.stopPropagation()">
               <h4>
@@ -1378,17 +2080,62 @@
               </h4>
               <div class="modal-cards">
                 @for (card of showOpponentBuildZone()!.buildZone; track card.instanceId) {
-                  <div class="game-card" [class.sideways]="card.cardType !== 0">
+                  <div
+                    class="game-card"
+                    [class.sideways]="card.cardType !== 0"
+                    (dblclick)="zoomCard.set(card)"
+                    (contextmenu)="openOpponentCardMenu($event, card)"
+                  >
                     <img src="assets/card-back.jpg" alt="Face Down Card" />
                     @if (card.counter !== null && card.counter !== undefined) {
                       <div class="counter-badge">{{ card.counter }}</div>
                     }
+                    <div class="arena-indicator" [class]="getArenaIndicatorClass(card)">
+                      {{ getArenaIndicatorText(card) }}
+                    </div>
                   </div>
                 } @empty {
                   <p class="text-muted">No cards in build zone</p>
                 }
               </div>
               <button class="btn btn-secondary mt-3" (click)="showOpponentBuildZone.set(null)">
+                Close
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Opponent Team Build Zone Modal (Team mode) -->
+        @if (showOpponentTeamBuildZone()) {
+          <div class="modal-overlay" (click)="showOpponentTeamBuildZone.set(false)">
+            <div class="modal-content" (click)="$event.stopPropagation()">
+              <h4>
+                Opponent Team Build Zone ({{ opponentTeamBuildZone().length }} cards)
+              </h4>
+              <div class="modal-cards">
+                @for (card of opponentTeamBuildZone(); track card.instanceId) {
+                  <div
+                    class="game-card"
+                    [class.sideways]="card.cardType !== 0"
+                    (dblclick)="zoomCard.set(card)"
+                    (contextmenu)="openOpponentCardMenu($event, card)"
+                  >
+                    <img src="assets/card-back.jpg" alt="Face Down Card" />
+                    @if (card.counter !== null && card.counter !== undefined) {
+                      <div class="counter-badge">{{ card.counter }}</div>
+                    }
+                    <div class="arena-indicator" [class]="getArenaIndicatorClass(card)">
+                      {{ getArenaIndicatorText(card) }}
+                    </div>
+                    @if (card.ownerUserId) {
+                      <div class="owner-badge">{{ card.ownerUserId.charAt(0) }}</div>
+                    }
+                  </div>
+                } @empty {
+                  <p class="text-muted">No cards in build zone</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="showOpponentTeamBuildZone.set(false)">
                 Close
               </button>
             </div>
@@ -1423,6 +2170,9 @@
                 <h6>Actions</h6>
                 <div class="d-grid gap-1">
                   <button class="btn btn-sm btn-primary" (click)="drawCard()">Draw Card</button>
+                  <button class="btn btn-sm btn-outline-primary" (click)="drawSevenCards()">
+                    Draw 7 Cards
+                  </button>
                   <button class="btn btn-sm btn-outline-primary" (click)="openDeckBrowser()">
                     View Deck
                   </button>
@@ -1487,6 +2237,59 @@
                   />
                   <button class="btn btn-sm btn-primary w-100" (click)="sendChatMessage()">Send</button>
                 </div>
+              </div>
+
+              <!-- Bidding -->
+              <div class="panel-section bidding-section">
+                <h6>Bidding</h6>
+                
+                <!-- Bid Input -->
+                <div class="bid-input-group">
+                  <div class="input-group input-group-sm">
+                    <input
+                      type="number"
+                      class="form-control"
+                      placeholder="Enter bid..."
+                      [formControl]="bidInput"
+                      min="1"
+                      (keyup.enter)="submitBid()"
+                    />
+                    <button class="btn btn-outline-primary" (click)="submitBid()">Bid</button>
+                  </div>
+                  @if (myBid() !== null) {
+                    <div class="current-bid mt-1">
+                      <span class="badge bg-info">Your bid: {{ myBid() }}</span>
+                      <button class="btn btn-sm btn-link text-danger p-0 ms-2" (click)="clearBid()">Clear</button>
+                    </div>
+                  }
+                </div>
+
+                <!-- Host Controls -->
+                @if (isHost()) {
+                  <div class="bid-host-controls mt-2">
+                    @if (bidsRevealed()) {
+                      <button class="btn btn-sm btn-outline-warning w-100" (click)="hideBids()">
+                        Hide Bids
+                      </button>
+                    } @else {
+                      <button class="btn btn-sm btn-outline-success w-100" (click)="revealBids()">
+                        Reveal Bids
+                      </button>
+                    }
+                  </div>
+                }
+
+                <!-- Revealed Bids -->
+                @if (bidsRevealed()) {
+                  <div class="revealed-bids mt-2">
+                    @for (bid of allBids(); track bid.label) {
+                      <div class="bid-result">
+                        <span class="bid-label">{{ bid.label }}:</span>
+                        <span class="bid-value">{{ bid.bid !== null ? bid.bid : 'No bid' }}</span>
+                      </div>
+                    }
+                  </div>
+                }
               </div>
             </div>
           }

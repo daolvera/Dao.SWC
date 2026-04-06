@@ -35,7 +35,7 @@ type DeckFilter = { kind: 'type'; value: CardType } | { kind: 'arena'; value: Ar
     <div class="container-fluid py-3">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <a routerLink="/decks" class="btn btn-link px-0">
+          <a routerLink="/decks" class="btn btn-link px-0 d-block">
             <i class="bi bi-arrow-left me-1"></i>Back to Decks
           </a>
           @if (editingName()) {
@@ -57,7 +57,7 @@ type DeckFilter = { kind: 'type'; value: CardType } | { kind: 'arena'; value: Ar
               </button>
             </div>
           } @else {
-            <h2 class="mb-0 d-inline-flex align-items-center gap-2">
+            <h2 class="mb-0 d-flex align-items-center gap-2">
               {{ deck()?.name ?? 'Loading...' }}
               @if (deck()) {
                 <button class="btn btn-link btn-sm p-0" (click)="startRename()" title="Rename deck">
@@ -67,12 +67,19 @@ type DeckFilter = { kind: 'type'; value: CardType } | { kind: 'arena'; value: Ar
             </h2>
           }
         </div>
-        <button class="btn btn-primary" [disabled]="saving()" (click)="saveDeck()">
-          @if (saving()) {
-            <span class="spinner-border spinner-border-sm me-2"></span>
+        <div class="d-flex gap-2">
+          @if (deck()) {
+            <a [href]="deckService.getExportUrl(deck()!.id)" class="btn btn-outline-secondary">
+              <i class="bi bi-download me-1"></i>Export Deck
+            </a>
           }
-          Save Deck
-        </button>
+          <button class="btn btn-primary" [disabled]="saving()" (click)="saveDeck()">
+            @if (saving()) {
+              <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            Save Deck
+          </button>
+        </div>
       </div>
 
       <!-- Validation Status -->
@@ -399,8 +406,17 @@ type DeckFilter = { kind: 'type'; value: CardType } | { kind: 'arena'; value: Ar
                             </button>
                           }
                           <button
+                            class="btn btn-sm btn-outline-primary"
+                            [disabled]="entry.quantity >= 4"
+                            (click)="addCard(entry.card)"
+                            title="Add copy"
+                          >
+                            <i class="bi bi-plus"></i>
+                          </button>
+                          <button
                             class="btn btn-sm btn-outline-danger"
                             (click)="removeCard(entry.card)"
+                            title="Remove copy"
                           >
                             <i class="bi bi-dash"></i>
                           </button>
@@ -436,7 +452,7 @@ export class DeckBuilderComponent implements OnInit, HasUnsavedChanges {
 
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private deckService = inject(DeckService);
+  protected deckService = inject(DeckService);
   private cardService = inject(CardService);
 
   // State

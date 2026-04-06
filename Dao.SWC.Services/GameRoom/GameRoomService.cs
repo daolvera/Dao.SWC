@@ -292,6 +292,18 @@ public class GameRoomService : IGameRoomService
             return false;
         }
 
+        // Initialize team data for team modes
+        if (room.IsTeamMode)
+        {
+            room.InitializeTeams();
+
+            // Set team build counters (60 for team modes)
+            foreach (var team in room.Teams.Values)
+            {
+                team.BuildCounter = 60;
+            }
+        }
+
         // Load cards for each player's deck
         foreach (var player in room.Players)
         {
@@ -382,6 +394,23 @@ public class GameRoomService : IGameRoomService
 
         var targetArena = arena?.ToLowerInvariant();
 
+        // Pilots can play normally to Character arena, but cannot be played directly to Space/Ground
+        // (they must be attached to a unit in Space/Ground from the Character arena)
+        if (card.IsPilot && (targetArena == "space" || targetArena == "ground"))
+        {
+            return Task.FromResult(
+                PlayCardResult.Fail($"{card.CardName} is a pilot and must be played to Character arena first, then attached to a unit")
+            );
+        }
+
+        // Equipment can only be attached to units, not played directly to arenas
+        if (card.CardType == CardType.Equipment && (targetArena == "space" || targetArena == "ground"))
+        {
+            return Task.FromResult(
+                PlayCardResult.Fail($"{card.CardName} is equipment and can only be attached to a unit")
+            );
+        }
+
         // Validate arena for unit cards
         if (card.CardType == CardType.Unit && !string.IsNullOrEmpty(targetArena))
         {
@@ -420,6 +449,7 @@ public class GameRoomService : IGameRoomService
                 card.Zone = CardZone.PlayArea;
                 card.Arena = targetArena;
                 card.StackParentId = stackTarget.InstanceId;
+                card.OwnerUserId = player.DisplayName; // Set owner for team mode (use display name to match frontend)
                 stackTarget.StackedUnderIds.Add(card.InstanceId);
                 return Task.FromResult(PlayCardResult.Ok(stackTarget, wasAutoStacked: true));
             }
@@ -437,6 +467,7 @@ public class GameRoomService : IGameRoomService
         card.ZonePosition = zonePosition ?? player.PlayArea.Count();
         card.Arena = targetArena;
         card.IsFaceDown = false; // Cards in arenas are always face up
+        card.OwnerUserId = player.DisplayName; // Set owner for team mode (use display name to match frontend)
 
         return Task.FromResult(PlayCardResult.Ok(card));
     }
@@ -462,6 +493,76 @@ public class GameRoomService : IGameRoomService
         if (card == null)
         {
             return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Get all cards (for team mode, need to search team members' cards)
+        IEnumerable<CardInstance> allCards;
+        if (room.IsTeamMode)
+        {
+            allCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+        }
+        else
+        {
+            allCards = player.Cards;
+        }
+
+        // Handle pilots attached to this unit - discard them too
+        if (card.HasPilots)
+        {
+            foreach (var pilotId in card.PilotCardIds.ToList())
+            {
+                var pilotCard = allCards.FirstOrDefault(c => c.InstanceId == pilotId);
+                if (pilotCard != null)
+                {
+                    pilotCard.Zone = CardZone.Discard;
+                    pilotCard.ZonePosition = null;
+                    pilotCard.IsTapped = false;
+                    pilotCard.IsFaceDown = false;
+                    pilotCard.Counter = null;
+                    pilotCard.PilotingUnitId = null;
+                    pilotCard.Arena = null;
+                }
+            }
+            card.PilotCardIds.Clear();
+        }
+
+        // Handle equipment attached to this unit - discard it too
+        if (card.HasEquipment && card.EquipmentCardId.HasValue)
+        {
+            var equipmentCard = allCards.FirstOrDefault(c => c.InstanceId == card.EquipmentCardId);
+            if (equipmentCard != null)
+            {
+                equipmentCard.Zone = CardZone.Discard;
+                equipmentCard.ZonePosition = null;
+                equipmentCard.IsTapped = false;
+                equipmentCard.IsFaceDown = false;
+                equipmentCard.Counter = null;
+                equipmentCard.EquippedToUnitId = null;
+                equipmentCard.Arena = null;
+            }
+            card.EquipmentCardId = null;
+        }
+
+        // If this card is a pilot, remove it from the unit it's piloting
+        if (card.IsPiloting && card.PilotingUnitId.HasValue)
+        {
+            var unitCard = allCards.FirstOrDefault(c => c.InstanceId == card.PilotingUnitId);
+            if (unitCard != null)
+            {
+                unitCard.PilotCardIds.Remove(card.InstanceId);
+            }
+            card.PilotingUnitId = null;
+        }
+
+        // If this card is equipment, remove it from the unit it's attached to
+        if (card.IsEquipped && card.EquippedToUnitId.HasValue)
+        {
+            var unitCard = allCards.FirstOrDefault(c => c.InstanceId == card.EquippedToUnitId);
+            if (unitCard != null)
+            {
+                unitCard.EquipmentCardId = null;
+            }
+            card.EquippedToUnitId = null;
         }
 
         // Handle stack removal - discard entire stack together
@@ -532,6 +633,68 @@ public class GameRoomService : IGameRoomService
         if (card == null)
         {
             return Task.FromResult<CardInstance?>(null);
+        }
+
+        // Get all cards (for team mode)
+        IEnumerable<CardInstance> allCards;
+        if (room.IsTeamMode)
+        {
+            allCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+        }
+        else
+        {
+            allCards = player.Cards;
+        }
+
+        // Handle pilots attached to this unit - return them to character arena
+        if (card.HasPilots)
+        {
+            foreach (var pilotId in card.PilotCardIds.ToList())
+            {
+                var pilotCard = allCards.FirstOrDefault(c => c.InstanceId == pilotId);
+                if (pilotCard != null)
+                {
+                    pilotCard.PilotingUnitId = null;
+                    pilotCard.Arena = "character";
+                    pilotCard.Zone = CardZone.PlayArea;
+                }
+            }
+            card.PilotCardIds.Clear();
+        }
+
+        // Handle equipment attached to this unit - return it to hand
+        if (card.HasEquipment && card.EquipmentCardId.HasValue)
+        {
+            var equipmentCard = allCards.FirstOrDefault(c => c.InstanceId == card.EquipmentCardId);
+            if (equipmentCard != null)
+            {
+                equipmentCard.EquippedToUnitId = null;
+                equipmentCard.Zone = CardZone.Hand;
+                equipmentCard.Arena = null;
+            }
+            card.EquipmentCardId = null;
+        }
+
+        // If this card is a pilot, remove it from the unit it's piloting
+        if (card.IsPiloting && card.PilotingUnitId.HasValue)
+        {
+            var unitCard = allCards.FirstOrDefault(c => c.InstanceId == card.PilotingUnitId);
+            if (unitCard != null)
+            {
+                unitCard.PilotCardIds.Remove(card.InstanceId);
+            }
+            card.PilotingUnitId = null;
+        }
+
+        // If this card is equipment, remove it from the unit it's attached to
+        if (card.IsEquipped && card.EquippedToUnitId.HasValue)
+        {
+            var unitCard = allCards.FirstOrDefault(c => c.InstanceId == card.EquippedToUnitId);
+            if (unitCard != null)
+            {
+                unitCard.EquipmentCardId = null;
+            }
+            card.EquippedToUnitId = null;
         }
 
         // If this card is a stack top, unstack all cards under it and return them to hand too
@@ -769,7 +932,21 @@ public class GameRoomService : IGameRoomService
         }
 
         // Clamp force to reasonable bounds (0 to 99)
-        player.Force = Math.Clamp(force, 0, 99);
+        var clampedForce = Math.Clamp(force, 0, 99);
+
+        // In team mode, update team force
+        if (room.IsTeamMode)
+        {
+            var teamData = room.GetPlayerTeam(userId);
+            if (teamData != null)
+            {
+                teamData.Force = clampedForce;
+                return Task.FromResult(true);
+            }
+        }
+
+        // For 1v1 mode, update player force
+        player.Force = clampedForce;
         return Task.FromResult(true);
     }
 
@@ -1055,6 +1232,7 @@ public class GameRoomService : IGameRoomService
         card.IsTapped = false;
         card.IsRetreated = false;
         card.Arena = null;
+        card.OwnerUserId = player.DisplayName; // Set owner for team mode (use display name to match frontend)
 
         return Task.FromResult<CardInstance?>(card);
     }
@@ -1072,7 +1250,20 @@ public class GameRoomService : IGameRoomService
             return Task.FromResult(false);
         }
 
-        // Toggle the appropriate arena retreat state
+        // In team mode, toggle team's arena retreat state
+        if (room.IsTeamMode)
+        {
+            var teamData = room.GetPlayerTeam(userId);
+            if (teamData != null)
+            {
+                var currentState = teamData.IsArenaRetreated(arena);
+                teamData.SetArenaRetreated(arena, !currentState);
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
+
+        // For 1v1 mode, toggle the player's arena retreat state
         switch (arena.ToLowerInvariant())
         {
             case "space":
@@ -1089,6 +1280,37 @@ public class GameRoomService : IGameRoomService
         }
 
         return Task.FromResult(true);
+    }
+
+    public Task<CardInstance?> ToggleCardRetreatAsync(
+        string roomCode,
+        string userId,
+        Guid cardInstanceId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId && c.Zone == CardZone.PlayArea
+        );
+
+        if (card == null)
+        {
+            return Task.FromResult<CardInstance?>(null);
+        }
+
+        card.IsRetreated = !card.IsRetreated;
+
+        return Task.FromResult<CardInstance?>(card);
     }
 
     public Task<PlayCardResult> MoveFromBuildAsync(
@@ -1118,6 +1340,23 @@ public class GameRoomService : IGameRoomService
         }
 
         var targetArena = arena.ToLowerInvariant();
+
+        // Pilots can play normally to Character arena, but cannot be played directly to Space/Ground
+        // (they must be attached to a unit in Space/Ground from the Character arena)
+        if (card.IsPilot && (targetArena == "space" || targetArena == "ground"))
+        {
+            return Task.FromResult(
+                PlayCardResult.Fail($"{card.CardName} is a pilot and must be played to Character arena first, then attached to a unit")
+            );
+        }
+
+        // Equipment can only be attached to units, not played directly to arenas
+        if (card.CardType == CardType.Equipment && (targetArena == "space" || targetArena == "ground"))
+        {
+            return Task.FromResult(
+                PlayCardResult.Fail($"{card.CardName} is equipment and can only be attached to a unit")
+            );
+        }
 
         // Validate arena for unit cards
         if (card.CardType == CardType.Unit && !string.IsNullOrEmpty(targetArena))
@@ -1158,6 +1397,7 @@ public class GameRoomService : IGameRoomService
                 card.Arena = targetArena;
                 card.StackParentId = stackTarget.InstanceId;
                 card.IsFaceDown = false; // Cards in arenas are always face up
+                card.OwnerUserId = player.DisplayName; // Set owner for team mode (use display name to match frontend)
                 stackTarget.StackedUnderIds.Add(card.InstanceId);
                 return Task.FromResult(PlayCardResult.Ok(stackTarget, wasAutoStacked: true));
             }
@@ -1176,6 +1416,7 @@ public class GameRoomService : IGameRoomService
         card.Arena = targetArena;
         card.ZonePosition = player.PlayArea.Count();
         card.IsFaceDown = false; // Cards in arenas are always face up
+        card.OwnerUserId = player.DisplayName; // Set owner for team mode (use display name to match frontend)
         // Counter is preserved
 
         return Task.FromResult(PlayCardResult.Ok(card));
@@ -1194,7 +1435,22 @@ public class GameRoomService : IGameRoomService
             return Task.FromResult(false);
         }
 
-        player.BuildCounter = buildCounter;
+        // Clamp build counter to reasonable bounds (0 to 99)
+        var clampedBuild = Math.Clamp(buildCounter, 0, 99);
+
+        // In team mode, update team build counter
+        if (room.IsTeamMode)
+        {
+            var teamData = room.GetPlayerTeam(userId);
+            if (teamData != null)
+            {
+                teamData.BuildCounter = clampedBuild;
+                return Task.FromResult(true);
+            }
+        }
+
+        // For 1v1 mode, update player build counter
+        player.BuildCounter = clampedBuild;
 
         return Task.FromResult(true);
     }
@@ -1261,6 +1517,7 @@ public class GameRoomService : IGameRoomService
                         DesignatedArena = deckCard.Card.Arena?.ToString().ToLowerInvariant(),
                         Version = deckCard.Card.Version,
                         Zone = CardZone.Deck,
+                        IsPilot = deckCard.Card.IsPilot,
                     }
                 );
             }
@@ -1639,6 +1896,394 @@ public class GameRoomService : IGameRoomService
             ConflictingVersion = conflictingCard.Version!,
             ConflictingArena = conflictingCard.Arena ?? "unknown"
         };
+    }
+
+    #endregion
+
+    #region Piloting
+
+    public Task<PilotResult> AddPilotAsync(
+        string roomCode,
+        string userId,
+        Guid pilotCardId,
+        Guid targetUnitId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(PilotResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(PilotResult.Fail("Player not found"));
+        }
+
+        var pilotCard = player.Cards.FirstOrDefault(c => c.InstanceId == pilotCardId);
+        if (pilotCard == null)
+        {
+            return Task.FromResult(PilotResult.Fail("Pilot card not found"));
+        }
+
+        // Validate pilot card is a pilot
+        if (!pilotCard.IsPilot)
+        {
+            return Task.FromResult(PilotResult.Fail("This character cannot pilot"));
+        }
+
+        // Validate pilot is in hand or character arena
+        if (pilotCard.Zone != CardZone.Hand && !(pilotCard.Zone == CardZone.PlayArea && pilotCard.Arena == "character"))
+        {
+            return Task.FromResult(PilotResult.Fail("Pilot must be in hand or character arena"));
+        }
+
+        // Validate pilot is not already piloting
+        if (pilotCard.IsPiloting)
+        {
+            return Task.FromResult(PilotResult.Fail("This pilot is already piloting a unit"));
+        }
+
+        // Find target unit - search in team arenas for team modes
+        CardInstance? targetUnit = null;
+        if (room.IsTeamMode)
+        {
+            // Team mode: search team members' cards
+            var allTeamCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+            targetUnit = allTeamCards.FirstOrDefault(c => c.InstanceId == targetUnitId);
+        }
+        else
+        {
+            targetUnit = player.Cards.FirstOrDefault(c => c.InstanceId == targetUnitId);
+        }
+
+        if (targetUnit == null)
+        {
+            return Task.FromResult(PilotResult.Fail("Target unit not found"));
+        }
+
+        // Validate target is a unit in space or ground arena
+        if (targetUnit.CardType != CardType.Unit)
+        {
+            return Task.FromResult(PilotResult.Fail("Target must be a unit card"));
+        }
+
+        if (targetUnit.Zone != CardZone.PlayArea)
+        {
+            return Task.FromResult(PilotResult.Fail("Target unit must be in play"));
+        }
+
+        if (targetUnit.Arena != "space" && targetUnit.Arena != "ground")
+        {
+            return Task.FromResult(PilotResult.Fail("Can only pilot units in space or ground arenas"));
+        }
+
+        // Validate max 2 pilots per unit
+        if (targetUnit.PilotCardIds.Count >= 2)
+        {
+            return Task.FromResult(PilotResult.Fail("Unit already has maximum pilots (2)"));
+        }
+
+        // Perform the pilot attachment
+        pilotCard.Zone = CardZone.PlayArea;
+        pilotCard.Arena = targetUnit.Arena;
+        pilotCard.PilotingUnitId = targetUnit.InstanceId;
+        pilotCard.IsFaceDown = false;
+        pilotCard.OwnerUserId = player.DisplayName;
+
+        targetUnit.PilotCardIds.Add(pilotCard.InstanceId);
+
+        return Task.FromResult(PilotResult.Ok(pilotCard, targetUnit));
+    }
+
+    public Task<PilotResult> RemovePilotAsync(string roomCode, string userId, Guid pilotCardId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(PilotResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(PilotResult.Fail("Player not found"));
+        }
+
+        var pilotCard = player.Cards.FirstOrDefault(c => c.InstanceId == pilotCardId);
+        if (pilotCard == null)
+        {
+            return Task.FromResult(PilotResult.Fail("Pilot card not found"));
+        }
+
+        if (!pilotCard.IsPiloting || pilotCard.PilotingUnitId == null)
+        {
+            return Task.FromResult(PilotResult.Fail("Card is not piloting any unit"));
+        }
+
+        // Find the unit being piloted (could be in team arenas)
+        CardInstance? targetUnit = null;
+        if (room.IsTeamMode)
+        {
+            var allTeamCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+            targetUnit = allTeamCards.FirstOrDefault(c => c.InstanceId == pilotCard.PilotingUnitId);
+        }
+        else
+        {
+            targetUnit = player.Cards.FirstOrDefault(c => c.InstanceId == pilotCard.PilotingUnitId);
+        }
+
+        // Remove pilot from unit's pilot list
+        if (targetUnit != null)
+        {
+            targetUnit.PilotCardIds.Remove(pilotCard.InstanceId);
+        }
+
+        // Move pilot to character arena
+        pilotCard.PilotingUnitId = null;
+        pilotCard.Arena = "character";
+        pilotCard.Zone = CardZone.PlayArea;
+
+        return Task.FromResult(PilotResult.Ok(pilotCard, targetUnit!));
+    }
+
+    public IEnumerable<CardInstance> GetPilotableUnits(string roomCode, string userId, Guid pilotCardId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return [];
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return [];
+        }
+
+        var pilotCard = player.Cards.FirstOrDefault(c => c.InstanceId == pilotCardId);
+        if (pilotCard == null || !pilotCard.IsPilot)
+        {
+            return [];
+        }
+
+        // Get all units in space and ground arenas that have room for pilots
+        IEnumerable<CardInstance> allCards;
+        if (room.IsTeamMode)
+        {
+            allCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+        }
+        else
+        {
+            allCards = player.Cards;
+        }
+
+        return allCards.Where(c =>
+            c.CardType == CardType.Unit
+            && c.Zone == CardZone.PlayArea
+            && (c.Arena == "space" || c.Arena == "ground")
+            && c.PilotCardIds.Count < 2
+            && !c.IsStackedUnder // Can only pilot the top card of a stack
+        );
+    }
+
+    #endregion
+
+    #region Equipment
+
+    public Task<EquipmentResult> AddEquipmentAsync(
+        string roomCode,
+        string userId,
+        Guid equipmentCardId,
+        Guid targetUnitId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(EquipmentResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Player not found"));
+        }
+
+        var equipmentCard = player.Cards.FirstOrDefault(c => c.InstanceId == equipmentCardId);
+        if (equipmentCard == null)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Equipment card not found"));
+        }
+
+        // Validate card is equipment type
+        if (equipmentCard.CardType != CardType.Equipment)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Card is not equipment"));
+        }
+
+        // Validate equipment is in hand
+        if (equipmentCard.Zone != CardZone.Hand)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Equipment must be in hand"));
+        }
+
+        // Validate equipment is not already equipped
+        if (equipmentCard.IsEquipped)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Equipment is already attached to a unit"));
+        }
+
+        // Find target unit
+        CardInstance? targetUnit = null;
+        if (room.IsTeamMode)
+        {
+            var allTeamCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+            targetUnit = allTeamCards.FirstOrDefault(c => c.InstanceId == targetUnitId);
+        }
+        else
+        {
+            targetUnit = player.Cards.FirstOrDefault(c => c.InstanceId == targetUnitId);
+        }
+
+        if (targetUnit == null)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Target unit not found"));
+        }
+
+        // Validate target is a unit in play
+        if (targetUnit.CardType != CardType.Unit)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Target must be a unit card"));
+        }
+
+        if (targetUnit.Zone != CardZone.PlayArea)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Target unit must be in play"));
+        }
+
+        // Validate arena restriction if equipment has a designated arena
+        if (!string.IsNullOrEmpty(equipmentCard.DesignatedArena))
+        {
+            if (!string.Equals(equipmentCard.DesignatedArena, targetUnit.Arena, StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(EquipmentResult.Fail(
+                    $"This equipment can only be attached to units in {equipmentCard.DesignatedArena} arena"
+                ));
+            }
+        }
+
+        // Validate unit doesn't already have equipment
+        if (targetUnit.HasEquipment)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Unit already has equipment attached"));
+        }
+
+        // Perform the equipment attachment
+        equipmentCard.Zone = CardZone.PlayArea;
+        equipmentCard.Arena = targetUnit.Arena;
+        equipmentCard.EquippedToUnitId = targetUnit.InstanceId;
+        equipmentCard.IsFaceDown = false;
+        equipmentCard.OwnerUserId = player.DisplayName;
+
+        targetUnit.EquipmentCardId = equipmentCard.InstanceId;
+
+        return Task.FromResult(EquipmentResult.Ok(equipmentCard, targetUnit));
+    }
+
+    public Task<EquipmentResult> RemoveEquipmentAsync(string roomCode, string userId, Guid equipmentCardId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(EquipmentResult.Fail("Room not found"));
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Player not found"));
+        }
+
+        var equipmentCard = player.Cards.FirstOrDefault(c => c.InstanceId == equipmentCardId);
+        if (equipmentCard == null)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Equipment card not found"));
+        }
+
+        if (!equipmentCard.IsEquipped || equipmentCard.EquippedToUnitId == null)
+        {
+            return Task.FromResult(EquipmentResult.Fail("Equipment is not attached to any unit"));
+        }
+
+        // Find the unit with the equipment
+        CardInstance? targetUnit = null;
+        if (room.IsTeamMode)
+        {
+            var allTeamCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+            targetUnit = allTeamCards.FirstOrDefault(c => c.InstanceId == equipmentCard.EquippedToUnitId);
+        }
+        else
+        {
+            targetUnit = player.Cards.FirstOrDefault(c => c.InstanceId == equipmentCard.EquippedToUnitId);
+        }
+
+        // Remove equipment from unit
+        if (targetUnit != null)
+        {
+            targetUnit.EquipmentCardId = null;
+        }
+
+        // Return equipment to hand
+        equipmentCard.EquippedToUnitId = null;
+        equipmentCard.Zone = CardZone.Hand;
+        equipmentCard.Arena = null;
+
+        return Task.FromResult(EquipmentResult.Ok(equipmentCard, targetUnit!));
+    }
+
+    public IEnumerable<CardInstance> GetEquippableUnits(
+        string roomCode,
+        string userId,
+        Guid equipmentCardId
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return [];
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return [];
+        }
+
+        var equipmentCard = player.Cards.FirstOrDefault(c => c.InstanceId == equipmentCardId);
+        if (equipmentCard == null || equipmentCard.CardType != CardType.Equipment)
+        {
+            return [];
+        }
+
+        // Get all units that can have equipment attached
+        IEnumerable<CardInstance> allCards;
+        if (room.IsTeamMode)
+        {
+            allCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+        }
+        else
+        {
+            allCards = player.Cards;
+        }
+
+        return allCards.Where(c =>
+            c.CardType == CardType.Unit
+            && c.Zone == CardZone.PlayArea
+            && !c.HasEquipment
+            && !c.IsStackedUnder // Can only equip the top card of a stack
+            && (
+                // If equipment has no designated arena, can go on any unit
+                string.IsNullOrEmpty(equipmentCard.DesignatedArena)
+                // If equipment has a designated arena, unit must be in that arena
+                || string.Equals(equipmentCard.DesignatedArena, c.Arena, StringComparison.OrdinalIgnoreCase)
+            )
+        );
     }
 
     #endregion
