@@ -44,12 +44,12 @@ var cardImporter = builder
 
 var apiService = builder
     .AddProject<Projects.Dao_SWC_ApiService>(Constants.ProjectNames.ApiService)
+    .PublishAsDockerFile(c => c.WithDockerfile(contextPath: "..", dockerfilePath: "Dao.SWC.ApiService/Dockerfile"))
     .WithExternalHttpEndpoints() // Required for OAuth callbacks
     .WaitForCompletion(migrations)
     .WithReference(swcDb)
     .WithReference(blobs)
-    .WithHttpHealthCheck("/health")
-    .PublishAsDockerFile();
+    .WithHttpHealthCheck("/health");
 
 if (builder.ExecutionContext.IsPublishMode)
 {

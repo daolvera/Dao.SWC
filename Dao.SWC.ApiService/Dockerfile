@@ -1,40 +1,60 @@
-# Stage 1: Build the .NET application
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Copy solution-level files and project files for restore
+# Copy project files for restore
+COPY Dao.SWC.ApiService/Dao.SWC.ApiService.csproj Dao.SWC.ApiService/
+COPY Dao.SWC.Services/Dao.SWC.Services.csproj Dao.SWC.Services/
 COPY Dao.SWC.Core/Dao.SWC.Core.csproj Dao.SWC.Core/
 COPY Dao.SWC.ServiceDefaults/Dao.SWC.ServiceDefaults.csproj Dao.SWC.ServiceDefaults/
-COPY Dao.SWC.Services/Dao.SWC.Services.csproj Dao.SWC.Services/
-COPY Dao.SWC.ApiService/Dao.SWC.ApiService.csproj Dao.SWC.ApiService/
 RUN dotnet restore Dao.SWC.ApiService/Dao.SWC.ApiService.csproj
 
-# Copy all source and publish
+# Copy source and publish
+COPY Dao.SWC.ApiService/ Dao.SWC.ApiService/
+COPY Dao.SWC.Services/ Dao.SWC.Services/
 COPY Dao.SWC.Core/ Dao.SWC.Core/
 COPY Dao.SWC.ServiceDefaults/ Dao.SWC.ServiceDefaults/
-COPY Dao.SWC.Services/ Dao.SWC.Services/
-COPY Dao.SWC.ApiService/ Dao.SWC.ApiService/
-RUN dotnet publish Dao.SWC.ApiService/Dao.SWC.ApiService.csproj -c Release -o /app/publish
+RUN dotnet publish Dao.SWC.ApiService/Dao.SWC.ApiService.csproj \
+    -c $BUILD_CONFIGURATION \
+    -o /app/publish \
+    /p:UseAppHost=false
 
-# Stage 2: Runtime with Playwright Chromium support
+# Install Playwright Chromium browser binaries (SDK image has pwsh)
+RUN pwsh /app/publish/playwright.ps1 install chromium
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
 
-# Install PowerShell (required by Playwright install script)
+# Install Chromium runtime OS dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    apt-transport-https \
-    && wget -q https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb \
-    && dpkg -i packages-microsoft-prod.deb \
-    && rm packages-microsoft-prod.deb \
-    && apt-get update && apt-get install -y --no-install-recommends powershell \
+    libasound2t64 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0t64 \
+    libatspi2.0-0t64 \
+    libcairo2 \
+    libcups2t64 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libglib2.0-0t64 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libwayland-client0 \
+    libx11-6 \
+    libxcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    libxshmfence1 \
+    fonts-liberation \
+    fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
 COPY --from=build /app/publish .
-
-# Install Playwright Chromium browser and its OS dependencies
-RUN pwsh playwright.ps1 install --with-deps chromium
-
-EXPOSE 8080
+COPY --from=build /root/.cache/ms-playwright /root/.cache/ms-playwright
 
 ENTRYPOINT ["dotnet", "Dao.SWC.ApiService.dll"]
