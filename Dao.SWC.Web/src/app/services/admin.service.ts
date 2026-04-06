@@ -28,6 +28,19 @@ export interface UserStatsDto {
   createdAt: string;
 }
 
+export interface CardScrapeNotFoundDto {
+  id: number;
+  name: string;
+  version: string | null;
+  imageUrl: string | null;
+}
+
+export interface CardTextScrapeResult {
+  filledCount: number;
+  notFoundCount: number;
+  notFoundCards: CardScrapeNotFoundDto[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -57,5 +70,9 @@ export class AdminService {
 
   getUserStats(): Observable<UserStatsDto[]> {
     return this.http.get<UserStatsDto[]>(`${this.baseUrl}/user-stats`);
+  }
+
+  scrapeCardTexts(): Observable<CardTextScrapeResult> {
+    return this.http.post<CardTextScrapeResult>(`${this.baseUrl}/scrape-card-texts`, {});
   }
 }

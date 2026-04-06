@@ -4,11 +4,12 @@ using Dao.SWC.ApiService.Hubs;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
 using Dao.SWC.Core.CardImport;
+using Dao.SWC.Core.CardTextScraping;
 using Dao.SWC.Core.Decks;
 using Dao.SWC.Core.GameRoom;
-using Dao.SWC.Core.DeckImport;
 using Dao.SWC.Services.Authentication;
 using Dao.SWC.Services.CardImport;
+using Dao.SWC.Services.CardTextScraping;
 using Dao.SWC.Services.Data;
 using Dao.SWC.Services.DeckImport;
 using Dao.SWC.Services.Decks;
@@ -70,6 +71,9 @@ builder.Services.AddScoped<IDeckService, DeckService>();
 builder.Services.AddScoped<IDeckValidationService, DeckValidationService>();
 builder.Services.AddScoped<ICardService, CardService>();
 builder.Services.AddScoped<ICardImageService, CardImageService>();
+
+// Card text scraping
+builder.Services.AddScoped<ICardTextScraperService, CardTextScraperService>();
 
 // Deck import services
 builder.Services.AddScoped<ICsvDeckParsingService, CsvDeckParsingService>();

@@ -895,9 +895,11 @@
         height: 196px;
       }
 
-      /* Hand cards that are sideways need extra margin to account for rotation */
+      /* Hand cards that are sideways need margin adjustments to account for rotation:
+         horizontal: expand by (height - width) / 2 for the wider visual footprint
+         vertical: shrink by (width - height) / 2 to collapse the empty space */
       .game-card.hand-card.sideways {
-        margin: 0 calc((196px - 140px) / 2);
+        margin: calc((140px - 196px) / 2) calc((196px - 140px) / 2);
       }
 
       .game-card.small {

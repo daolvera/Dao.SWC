@@ -584,58 +584,28 @@
                           card of getPlayerArenaUnits(opponent, 'character');
                           track card.instanceId
                         ) {
-                          @if (hasStack(card)) {
-                            <div class="card-stack small">
+                          <div class="card-wrapper small" [class.has-stack]="hasStack(card)" [class.has-pilots]="hasPilots(card)" [class.has-equipment]="hasEquipment(card)">
+                            <!-- Pilot cards attached to this unit -->
+                            @for (pilotCard of getPilotCards(card); track pilotCard.instanceId) {
                               <div
-                                class="game-card small stack-top"
-                                [class.tapped]="card.isTapped"
-                                [class.retreated]="card.isRetreated"
-                                (dblclick)="zoomCard.set(card)"
-                                (contextmenu)="openOpponentCardMenu($event, card)"
+                                class="game-card small pilot-card"
+                                (dblclick)="zoomCard.set(pilotCard)"
                               >
-                                <img
-                                  [src]="card.cardImageUrl || 'assets/card-back.jpg'"
-                                  [alt]="card.cardName"
-                                />
-                                @if (card.isTapped) {
-                                  <div class="tapped-indicator small">TAP</div>
-                                }
-                                @if (card.isRetreated) {
-                                  <div class="retreated-indicator small">RETREAT</div>
-                                }
-                                @if (card.counter !== null && card.counter !== undefined) {
-                                  <div class="counter-badge small">{{ card.counter }}</div>
-                                }
-                                @if (card.damage !== null && card.damage !== undefined) {
-                                  <div class="damage-badge small">{{ card.damage }}</div>
-                                }
-                                @if (card.version) {
-                                  <div class="version-badge small">{{ card.version }}</div>
-                                }
+                                <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
-                              @for (
-                                stackedCard of getStackedCards(opponent, card);
-                                track stackedCard.instanceId
-                              ) {
-                                <div
-                                  class="game-card small stacked-card"
-                                  [class.retreated]="stackedCard.isRetreated"
-                                  (dblclick)="zoomCard.set(stackedCard)"
-                                  (contextmenu)="openOpponentCardMenu($event, stackedCard)"
-                                >
-                                  <img
-                                    [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
-                                    [alt]="stackedCard.cardName"
-                                  />
-                                  @if (stackedCard.version) {
-                                    <div class="version-badge small">{{ stackedCard.version }}</div>
-                                  }
-                                </div>
-                              }
-                            </div>
-                          } @else {
+                            }
+                            <!-- Equipment card attached to this unit -->
+                            @if (getEquipmentCard(card); as equipCard) {
+                              <div
+                                class="game-card small equipment-card"
+                                (dblclick)="zoomCard.set(equipCard)"
+                              >
+                                <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
+                              </div>
+                            }
+                            <!-- Top card -->
                             <div
-                              class="game-card small"
+                              class="game-card small stack-top"
                               [class.tapped]="card.isTapped"
                               [class.retreated]="card.isRetreated"
                               (dblclick)="zoomCard.set(card)"
@@ -660,8 +630,33 @@
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
                               }
+                              @if (hasStack(card)) {
+                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
+                              }
+                              @if (hasPilots(card)) {
+                                <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
+                              }
                             </div>
-                          }
+                            @for (
+                              stackedCard of getStackedCards(opponent, card);
+                              track stackedCard.instanceId
+                            ) {
+                              <div
+                                class="game-card small stacked-card"
+                                [class.retreated]="stackedCard.isRetreated"
+                                (dblclick)="zoomCard.set(stackedCard)"
+                                (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                              >
+                                <img
+                                  [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
+                                  [alt]="stackedCard.cardName"
+                                />
+                                @if (stackedCard.version) {
+                                  <div class="version-badge small">{{ stackedCard.version }}</div>
+                                }
+                              </div>
+                            }
+                          </div>
                         }
                       </div>
                     </div>

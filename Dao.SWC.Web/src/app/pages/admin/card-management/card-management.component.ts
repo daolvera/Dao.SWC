@@ -44,6 +44,13 @@ interface EditableCard extends CardDto {
           <h2 class="mb-0">Card Management</h2>
         </div>
         <div class="d-flex gap-2">
+          <a
+            routerLink="/admin/card-text-fill"
+            class="btn btn-outline-info"
+            title="Auto-fill card text from swtcg.com"
+          >
+            <i class="bi bi-cloud-download me-1"></i>Auto-Fill Text
+          </a>
           <button
             class="btn btn-outline-secondary"
             [disabled]="seeding()"

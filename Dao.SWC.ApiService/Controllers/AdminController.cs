@@ -1,4 +1,5 @@
 using Dao.SWC.Core;
+using Dao.SWC.Core.CardTextScraping;
 using Dao.SWC.Core.Entities;
 using Dao.SWC.Core.Enums;
 using Dao.SWC.Services.Data;
@@ -15,7 +16,8 @@ namespace Dao.SWC.ApiService.Controllers;
 public class AdminController(
     UserManager<AppUser> userManager,
     RoleManager<IdentityRole> roleManager,
-    SwcDbContext dbContext
+    SwcDbContext dbContext,
+    ICardTextScraperService cardTextScraperService
 ) : ControllerBase
 {
     /// <summary>
@@ -430,6 +432,17 @@ public class AdminController(
         await dbContext.SaveChangesAsync();
 
         return Ok(new SeedCardsResult(testCards.Count, existingCount + testCards.Count));
+    }
+
+    /// <summary>
+    /// Scrape card text from swtcg.com for cards that don't have card text.
+    /// </summary>
+    [HttpPost("scrape-card-texts")]
+    [ProducesResponseType(typeof(CardTextScrapeResult), 200)]
+    public async Task<IActionResult> ScrapeCardTexts(CancellationToken cancellationToken)
+    {
+        var result = await cardTextScraperService.ScrapeCardTextsAsync(cancellationToken);
+        return Ok(result);
     }
 }
 
