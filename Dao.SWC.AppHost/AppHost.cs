@@ -48,7 +48,8 @@ var apiService = builder
     .WaitForCompletion(migrations)
     .WithReference(swcDb)
     .WithReference(blobs)
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .PublishAsDockerFile();
 
 if (builder.ExecutionContext.IsPublishMode)
 {
