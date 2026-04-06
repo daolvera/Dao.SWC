@@ -45,13 +45,13 @@ var cardImporter = builder
 // Card Text Scraper console app - scrapes card text from swtcg.com
 var cardTextScraper = builder
     .AddProject<Projects.Dao_SWC_CardTextScraper>(Constants.ProjectNames.CardTextScraper)
+    .PublishAsDockerFile(c => c.WithDockerfile(contextPath: "..", dockerfilePath: "Dao.SWC.CardTextScraper/Dockerfile"))
     .WithReference(swcDb)
     .WaitForCompletion(migrations)
     .WithExplicitStart();
 
 var apiService = builder
     .AddProject<Projects.Dao_SWC_ApiService>(Constants.ProjectNames.ApiService)
-    .PublishAsDockerFile(c => c.WithDockerfile(contextPath: "..", dockerfilePath: "Dao.SWC.ApiService/Dockerfile"))
     .WithExternalHttpEndpoints() // Required for OAuth callbacks
     .WaitForCompletion(migrations)
     .WithReference(swcDb)
