@@ -44,6 +44,13 @@ interface EditableCard extends CardDto {
           <h2 class="mb-0">Card Management</h2>
         </div>
         <div class="d-flex gap-2">
+          <a
+            routerLink="/admin/card-text-fill"
+            class="btn btn-outline-info"
+            title="View and edit cards missing text"
+          >
+            <i class="bi bi-pencil-square me-1"></i>Cards Missing Text
+          </a>
           <button
             class="btn btn-outline-secondary"
             [disabled]="seeding()"

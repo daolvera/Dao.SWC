@@ -58,4 +58,5 @@ export class AdminService {
   getUserStats(): Observable<UserStatsDto[]> {
     return this.http.get<UserStatsDto[]>(`${this.baseUrl}/user-stats`);
   }
+
 }

@@ -916,14 +916,16 @@
         height: 196px;
       }
 
-      /* Hand cards that are sideways need extra margin to account for rotation */
+      /* Hand cards that are sideways need margin adjustments to account for rotation:
+         horizontal: expand by (height - width) / 2 for the wider visual footprint
+         vertical: shrink by (width - height) / 2 to collapse the empty space */
       .game-card.hand-card.sideways {
-        margin: 0 calc((196px - 140px) / 2);
+        margin: calc((140px - 196px) / 2) calc((196px - 140px) / 2);
       }
 
       .game-card.small {
-        width: 75px;
-        height: 105px;
+        width: 80px;
+        height: 112px;
       }
 
       .game-card.tiny {
@@ -1720,7 +1722,7 @@
           border-width: 1px;
 
           .stacked-card {
-            width: 20px;
+            width: 22px;
           }
         }
       }
@@ -1740,7 +1742,7 @@
           border-width: 1px;
 
           .stacked-card {
-            width: 20px;
+            width: 22px;
           }
         }
       }
@@ -1886,28 +1888,26 @@
         }
       }
 
-      // Pilot card shown as narrow slice next to unit
+      // Pilot card shown fully next to unit (like equipment)
       .pilot-card {
         position: relative;
         z-index: 5;
         order: -2; // Pilots appear leftmost
-        width: 25px;
         flex-shrink: 0;
-        overflow: hidden;
         border-radius: 3px;
-        border: 1px solid rgba(128, 0, 128, 0.8);
+        border: 2px solid rgba(128, 0, 128, 0.8);
         cursor: pointer;
 
         img {
-          position: absolute;
-          left: 0;
-          top: 0;
+          width: 100%;
           height: 100%;
-          width: auto;
+          object-fit: cover;
+          border-radius: 2px;
         }
 
         &.small {
-          width: 18px;
+          width: 55px;
+          height: 77px;
         }
       }
 
@@ -1963,8 +1963,8 @@
 
         // Equipment cards are sideways (wider than tall), so swap dimensions
         &.small {
-          width: 70px;
-          height: 50px;
+          width: 77px;
+          height: 55px;
         }
       }
 

@@ -73,6 +73,11 @@ public partial class CardService(SwcDbContext dbContext, ICardImageService image
             query = query.Where(c => c.Arena == filter.Arena.Value);
         }
 
+        if (filter.MissingCardText)
+        {
+            query = query.Where(c => c.CardText == null || c.CardText.Trim() == "");
+        }
+
         var totalCount = await query.CountAsync();
         var totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize);
 

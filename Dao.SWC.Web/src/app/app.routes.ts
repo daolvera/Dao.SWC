@@ -57,6 +57,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'admin/card-text-fill',
+    canActivate: [authGuard, roleGuard('Admin')],
+    loadComponent: () =>
+      import('./pages/admin/card-text-fill/card-text-fill.component').then(
+        (m) => m.CardTextFillComponent,
+      ),
+  },
+  {
     path: 'admin/users',
     canActivate: [authGuard, roleGuard('Admin')],
     loadComponent: () =>

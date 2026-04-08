@@ -599,7 +599,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   // Get non-units from a player's arena
   getPlayerArenaOthers(player: GamePlayerDto, arena: string): CardInstanceDto[] {
     const arenaCards = player.arenas[arena] ?? [];
-    return arenaCards.filter((c) => c.cardType !== CARD_TYPE_UNIT);
+    return arenaCards.filter((c) => c.cardType !== CARD_TYPE_UNIT && !this.isEquipped(c));
   }
 
   // Get stacked cards under a given card
@@ -1607,7 +1607,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   getPilotCards(card: CardInstanceDto): CardInstanceDto[] {
     if (!card.pilotCardIds || card.pilotCardIds.length === 0) return [];
     
-    // Get all cards from all arenas (mine and opponent's)
+    // Get all cards from all arenas (mine, opponent team, and individual opponents)
     const allArenaCards = [
       ...this.getMyArenaCards('space'),
       ...this.getMyArenaCards('ground'),
@@ -1615,6 +1615,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       ...this.getOpponentTeamArenaCards('space'),
       ...this.getOpponentTeamArenaCards('ground'),
       ...this.getOpponentTeamArenaCards('character'),
+      ...this.opponents().flatMap((o) => Object.values(o.arenas).flat()),
     ];
     
     return card.pilotCardIds
@@ -1800,7 +1801,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   getEquipmentCard(card: CardInstanceDto): CardInstanceDto | null {
     if (!card.equipmentCardId) return null;
     
-    // Get all cards from all arenas (mine and opponent's)
+    // Get all cards from all arenas (mine, opponent team, and individual opponents)
     const allArenaCards = [
       ...this.getMyArenaCards('space'),
       ...this.getMyArenaCards('ground'),
@@ -1808,6 +1809,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       ...this.getOpponentTeamArenaCards('space'),
       ...this.getOpponentTeamArenaCards('ground'),
       ...this.getOpponentTeamArenaCards('character'),
+      ...this.opponents().flatMap((o) => Object.values(o.arenas).flat()),
     ];
     
     return allArenaCards.find((c) => c.instanceId === card.equipmentCardId) ?? null;
@@ -1846,17 +1848,17 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   getEquippableTargets(equipmentCard: CardInstanceDto): CardInstanceDto[] {
     // Get all my units in arenas that have no equipment and match arena restrictions
     let arenaUnits: CardInstanceDto[] = [];
-    if (equipmentCard.cardArena) {
-      // Equipment has designated arena restriction
-      const arena = equipmentCard.cardArena.toLowerCase();
-      arenaUnits = this.getMyArenaCards(arena);
-    } else {
-      // Equipment can go on any unit in any arena
+    if (!equipmentCard.cardArena) {
+      // Equipment has no designated arena restriction - can go on units in any arena
       arenaUnits = [
         ...this.getMyArenaCards('space'),
         ...this.getMyArenaCards('ground'),
         ...this.getMyArenaCards('character'),
       ];
+    } else {
+      // Equipment has designated arena restriction
+      const arena = equipmentCard.cardArena.toLowerCase();
+      arenaUnits = this.getMyArenaCards(arena);
     }
     
     return arenaUnits.filter((card: CardInstanceDto) =>
