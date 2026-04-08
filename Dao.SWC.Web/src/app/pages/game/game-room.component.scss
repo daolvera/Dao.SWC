@@ -7,7 +7,7 @@
         display: flex;
         flex-direction: column;
         height: 100vh;
-        background: 
+        background:
           linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)),
           url('/assets/arena-back.jpg') center center / cover no-repeat;
         color: white;
@@ -669,6 +669,21 @@
         .build-control .control-label {
           color: #87ceeb;
         }
+
+        .teammate-controls {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-left: 1rem;
+          padding-left: 1rem;
+          border-left: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .teammate-hand-btn {
+          font-size: 0.75rem;
+          padding: 0.25rem 0.5rem;
+          white-space: nowrap;
+        }
       }
 
       .hand-row {
@@ -854,6 +869,12 @@
           transform 0.2s,
           box-shadow 0.2s;
         background: #1a1a2e;
+
+        /* Touch support - prevent native iOS context menu and text selection */
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        touch-action: manipulation;
       }
 
       .game-card:hover {
@@ -934,22 +955,31 @@
         position: absolute;
         top: 50%;
         left: 50%;
-        margin-top: -35.7%;
+        margin-top: -50.7%;
         margin-left: -70%;
       }
 
       .game-card.sideways.small img {
         width: 140%;
         height: 71.4%;
-        margin-top: -35.7%;
+        margin-top: -50.7%;
         margin-left: -70%;
       }
 
       .game-card.sideways.tiny img {
         width: 140%;
         height: 71.4%;
-        margin-top: -35.7%;
+        margin-top: -50.7%;
         margin-left: -70%;
+      }
+
+      /* Face-down sideways cards: don't rotate the card-back image since it's already portrait-oriented */
+      .game-card.sideways.face-down img {
+        transform: none;
+        width: 100%;
+        height: 100%;
+        position: static;
+        margin: 0;
       }
 
       .card-name {
@@ -1348,7 +1378,7 @@
         position: absolute;
         top: 50%;
         left: 50%;
-        margin-top: -35.7%;
+        margin-top: -50.7%;
         margin-left: -70%;
       }
 
@@ -1382,6 +1412,43 @@
         max-width: none;
         max-height: 60vh;
         overflow-y: auto;
+      }
+
+      /* Teammate Hand Modal */
+      .teammate-hand-modal {
+        max-width: 90vw;
+        width: auto;
+        min-width: 300px;
+      }
+
+      .teammate-hand-cards {
+        max-height: 60vh;
+        overflow-y: auto;
+        justify-content: center;
+      }
+
+      .teammate-hand-cards .game-card {
+        cursor: pointer;
+      }
+
+      .teammate-hand-cards .game-card:hover {
+        transform: scale(1.05);
+        z-index: 10;
+      }
+
+      .card-name-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        font-size: 0.6rem;
+        padding: 2px 4px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       /* Face Down Card */
@@ -1517,6 +1584,12 @@
         height: 12px;
       }
 
+      /* Sideways cards: rotate badges back so they remain readable */
+      .game-card.sideways .counter-badge,
+      .game-card.sideways .damage-badge {
+        transform: rotate(-90deg);
+      }
+
       /* Retreated Cards */
       .game-card.retreated {
         opacity: 0.6;
@@ -1628,24 +1701,24 @@
         display: inline-flex;
         flex-direction: row;
         align-items: stretch;
-        
+
         /* Only add stack styling when there's actually a stack */
         &.has-stack {
           padding: 4px;
           border: 2px solid rgba(255, 215, 0, 0.5);
           border-radius: 6px;
           background: rgba(255, 215, 0, 0.1);
-          
+
           .stack-top {
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
           }
         }
-        
+
         /* Small card wrapper stacking styles */
         &.small.has-stack {
           padding: 2px;
           border-width: 1px;
-          
+
           .stacked-card {
             width: 20px;
           }
@@ -1661,11 +1734,11 @@
         border: 2px solid rgba(255, 215, 0, 0.5);
         border-radius: 6px;
         background: rgba(255, 215, 0, 0.1);
-        
+
         &.small {
           padding: 2px;
           border-width: 1px;
-          
+
           .stacked-card {
             width: 20px;
           }
@@ -1686,7 +1759,7 @@
         width: 30px;
         flex-shrink: 0;
         overflow: hidden;
-        
+
         img {
           position: absolute;
           left: 0;
@@ -1740,12 +1813,12 @@
         padding: 1px 3px;
         border-radius: 2px;
         z-index: 15;
-        
+
         &.small {
           font-size: 0.4rem;
           padding: 1px 2px;
         }
-        
+
         &.zoom {
           font-size: 1.2rem;
           padding: 4px 10px;
@@ -1768,12 +1841,12 @@
         border-radius: 2px;
         z-index: 15;
         text-transform: uppercase;
-        
+
         &.small {
           font-size: 0.4rem;
           padding: 1px 2px;
         }
-        
+
         &.tiny {
           font-size: 0.35rem;
           padding: 1px 2px;
@@ -1783,7 +1856,7 @@
       // Owner highlight for team mode cards
       .game-card.owner-highlight {
         box-shadow: 0 0 0 2px rgba(147, 112, 219, 0.6);
-        
+
         &[data-owner]:not([data-owner=""]) {
           // Different colors for different owners (first two players)
           &:nth-child(odd) {
@@ -1802,11 +1875,11 @@
         border: 2px solid rgba(128, 0, 128, 0.6); // Purple
         border-radius: 6px;
         background: rgba(128, 0, 128, 0.15);
-        
+
         .stack-top, .game-card:not(.pilot-card):not(.equipment-card) {
           box-shadow: 0 0 10px rgba(128, 0, 128, 0.6);
         }
-        
+
         &.small {
           padding: 2px;
           border-width: 1px;
@@ -1824,7 +1897,7 @@
         border-radius: 3px;
         border: 1px solid rgba(128, 0, 128, 0.8);
         cursor: pointer;
-        
+
         img {
           position: absolute;
           left: 0;
@@ -1832,7 +1905,7 @@
           height: 100%;
           width: auto;
         }
-        
+
         &.small {
           width: 18px;
         }
@@ -1849,7 +1922,7 @@
         padding: 1px 3px;
         border-radius: 2px;
         z-index: 20;
-        
+
         &.small {
           font-size: 0.4rem;
           padding: 1px 2px;
@@ -1862,11 +1935,11 @@
         border: 2px solid rgba(128, 128, 128, 0.6); // Grey
         border-radius: 6px;
         background: rgba(128, 128, 128, 0.15);
-        
+
         .stack-top, .game-card:not(.pilot-card):not(.equipment-card) {
           box-shadow: 0 0 10px rgba(128, 128, 128, 0.6);
         }
-        
+
         &.small {
           padding: 2px;
           border-width: 1px;
@@ -1880,14 +1953,14 @@
         flex-shrink: 0;
         border-radius: 3px;
         border: 2px solid rgba(128, 128, 128, 0.8);
-        
+
         img {
           width: 100%;
           height: 100%;
           object-fit: cover;
           border-radius: 2px;
         }
-        
+
         // Equipment cards are sideways (wider than tall), so swap dimensions
         &.small {
           width: 70px;
@@ -1906,7 +1979,7 @@
         padding: 1px 3px;
         border-radius: 2px;
         z-index: 20;
-        
+
         &.small {
           font-size: 0.4rem;
           padding: 1px 2px;
@@ -1954,7 +2027,7 @@
           color: #ffd700;
           margin-right: 0.5rem;
         }
-        
+
         .player-name {
           background: rgba(255, 255, 255, 0.1);
           padding: 0.15rem 0.4rem;

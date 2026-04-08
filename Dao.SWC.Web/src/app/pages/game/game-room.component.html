@@ -947,6 +947,11 @@
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
                             (contextmenu)="isCardOwner(card) ? openCardMenu($event, card) : openOpponentCardMenu($event, card)"
+                            appTouchCard
+                            [touchDraggable]="isCardOwner(card)"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (touchDragStart)="onTouchDragStart($event, card, 'character')"
+                            (touchDragEnd)="onTouchDrop($event, card, 'character')"
                           >
                             <img
                               [src]="
@@ -1109,6 +1114,11 @@
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
                             (contextmenu)="isCardOwner(card) ? openCardMenu($event, card) : openOpponentCardMenu($event, card)"
+                            appTouchCard
+                            [touchDraggable]="isCardOwner(card)"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (touchDragStart)="onTouchDragStart($event, card, 'ground')"
+                            (touchDragEnd)="onTouchDrop($event, card, 'ground')"
                           >
                             <img
                               [src]="
@@ -1274,6 +1284,11 @@
                             (click)="selectCard(card.instanceId)"
                             (dblclick)="zoomCard.set(card)"
                             (contextmenu)="isCardOwner(card) ? openCardMenu($event, card) : openOpponentCardMenu($event, card)"
+                            appTouchCard
+                            [touchDraggable]="isCardOwner(card)"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (touchDragStart)="onTouchDragStart($event, card, 'space')"
+                            (touchDragEnd)="onTouchDrop($event, card, 'space')"
                           >
                             <img
                               [src]="
@@ -1446,6 +1461,21 @@
                 />
                 <button class="btn btn-sm btn-outline-light force-btn" (click)="incrementBuild()">+</button>
               </div>
+
+              <!-- Teammate Hand Buttons (Team Mode Only) -->
+              @if (isTeamMode() && teammates().length > 0) {
+                <div class="teammate-controls">
+                  @for (teammate of teammates(); track teammate.username) {
+                    <button
+                      class="btn btn-sm btn-outline-info teammate-hand-btn"
+                      (click)="openTeammateHandModal(teammate.username)"
+                      title="View teammate hand"
+                    >
+                      👁 {{ teammate.username }}'s Hand ({{ teammate.hand.length }})
+                    </button>
+                  }
+                </div>
+              }
               
               <!-- Build Zone -->
               <div
@@ -1514,6 +1544,11 @@
                   (click)="selectCard(card.instanceId)"
                   (dblclick)="zoomCard.set(card)"
                   (contextmenu)="openHandCardMenu($event, card)"
+                  appTouchCard
+                  [touchDraggable]="card.cardType !== 2"
+                  (longPress)="onTouchLongPress($event, card, 'hand')"
+                  (touchDragStart)="onTouchDragStart($event, card, 'hand')"
+                  (touchDragEnd)="onTouchDrop($event, card, 'hand')"
                 >
                   <img [src]="card.cardImageUrl || 'assets/card-back.jpg'" [alt]="card.cardName" />
                   <div class="card-name">{{ card.cardName }}</div>
@@ -1567,6 +1602,11 @@
                     (dragstart)="onDragStart($event, card, 'discard')"
                     (dragend)="onDragEnd()"
                     (contextmenu)="openDiscardCardMenu($event, card)"
+                    appTouchCard
+                    [touchDraggable]="true"
+                    (longPress)="onTouchLongPress($event, card, 'discard')"
+                    (touchDragStart)="onTouchDragStart($event, card, 'discard')"
+                    (touchDragEnd)="onTouchDrop($event, card, 'discard')"
                   >
                     <img
                       [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -1602,6 +1642,11 @@
                     (dragend)="onDragEnd()"
                     (dblclick)="zoomCard.set(card)"
                     (contextmenu)="isCardOwner(card) ? openBuildCardMenu($event, card) : openOpponentCardMenu($event, card)"
+                    appTouchCard
+                    [touchDraggable]="isCardOwner(card)"
+                    (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'build' : 'opponent')"
+                    (touchDragStart)="onTouchDragStart($event, card, 'build')"
+                    (touchDragEnd)="onTouchDrop($event, card, 'build')"
                   >
                     <img
                       [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -2064,6 +2109,33 @@
                 }
               </div>
               <button class="btn btn-secondary mt-3" (click)="closeEquipmentModal()">Cancel</button>
+            </div>
+          </div>
+        }
+
+        <!-- Teammate Hand Modal (Team Mode) -->
+        @if (showTeammateHandModal() && teammateHandPlayer()) {
+          <div class="modal-overlay" (click)="closeTeammateHandModal()">
+            <div class="modal-content teammate-hand-modal" (click)="$event.stopPropagation()">
+              <h4>{{ teammateHandPlayer()!.username }}'s Hand ({{ teammateHandPlayer()!.hand.length }} cards)</h4>
+              <div class="modal-cards teammate-hand-cards">
+                @for (card of teammateHandPlayer()!.hand; track card.instanceId) {
+                  <div
+                    class="game-card"
+                    [class.sideways]="card.cardType !== 0"
+                    (dblclick)="zoomCard.set(card)"
+                  >
+                    <img
+                      [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                      [alt]="card.cardName"
+                    />
+                    <div class="card-name-overlay">{{ card.cardName }}</div>
+                  </div>
+                } @empty {
+                  <p class="text-muted">No cards in hand</p>
+                }
+              </div>
+              <button class="btn btn-secondary mt-3" (click)="closeTeammateHandModal()">Close</button>
             </div>
           </div>
         }

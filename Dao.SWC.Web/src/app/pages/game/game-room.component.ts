@@ -29,6 +29,7 @@ import { Alignment } from '../../models/dtos/card.dto';
 import { GameHubService } from '../../services/game-hub.service';
 import { NotificationService } from '../../services/notification.service';
 import { NotificationsComponent } from '../../components/notifications/notifications.component';
+import { TouchCardDirective, TouchDragEvent, TouchDropEvent } from '../../directives/touch-card.directive';
 
 type CardZone = 'deck' | 'hand' | 'space' | 'ground' | 'character' | 'discard' | 'build';
 
@@ -47,7 +48,7 @@ const CARD_TYPE_BATTLE = 4;
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ['./game-room.component.scss'],
   templateUrl: './game-room.component.html',
-  imports: [ReactiveFormsModule, RouterLink, FormsModule, NotificationsComponent, TitleCasePipe],
+  imports: [ReactiveFormsModule, RouterLink, FormsModule, NotificationsComponent, TitleCasePipe, TouchCardDirective],
 })
 export class GameRoomComponent implements OnInit, OnDestroy {
   protected readonly RoomType = RoomType;
@@ -201,6 +202,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   // Equipment modal state
   showEquipmentModal = signal(false);
   equipmentModalCard = signal<CardInstanceDto | null>(null);
+
+  // Teammate hand modal state
+  showTeammateHandModal = signal<string | null>(null); // username of teammate to show
+
+  teammateHandPlayer = computed(() => {
+    const username = this.showTeammateHandModal();
+    if (!username) return null;
+    return this.teammates().find((t) => t.username === username) ?? null;
+  });
 
   private draggedCard: DraggedCard | null = null;
   private subscriptions: Subscription[] = [];
@@ -1167,6 +1177,123 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Touch event handlers for iPad/mobile support
+  onTouchLongPress(event: TouchDragEvent, card: CardInstanceDto, menuType: 'card' | 'hand' | 'build' | 'discard' | 'opponent'): void {
+    switch (menuType) {
+      case 'card':
+        this.cardMenuCardId.set(card.instanceId);
+        this.setMenuPosition(event.clientX, event.clientY);
+        break;
+      case 'hand':
+        this.handCardMenuCardId.set(card.instanceId);
+        this.setMenuPosition(event.clientX, event.clientY, 350);
+        this.checkStackableTargets(card);
+        break;
+      case 'build':
+        this.buildCardMenuCardId.set(card.instanceId);
+        this.setMenuPosition(event.clientX, event.clientY);
+        break;
+      case 'discard':
+        this.discardCardMenuCardId.set(card.instanceId);
+        this.setMenuPosition(event.clientX, event.clientY);
+        break;
+      case 'opponent':
+        this.opponentCardMenuCard.set(card);
+        this.setMenuPosition(event.clientX, event.clientY);
+        break;
+    }
+  }
+
+  onTouchDragStart(event: TouchDragEvent, card: CardInstanceDto, zone: CardZone): void {
+    this.draggedCard = { card, sourceZone: zone };
+  }
+
+  async onTouchDrop(event: TouchDropEvent, card: CardInstanceDto, sourceZone: CardZone): Promise<void> {
+    if (!event.dropTarget) {
+      this.draggedCard = null;
+      return;
+    }
+
+    const targetZone = this.getZoneFromElement(event.dropTarget);
+    if (!targetZone) {
+      this.draggedCard = null;
+      return;
+    }
+
+    // If dropping in the same arena, handle reordering
+    if (sourceZone === targetZone && this.isArenaZone(targetZone)) {
+      this.handleTouchArenaReorder(event, card, targetZone);
+      this.draggedCard = null;
+      return;
+    }
+
+    if (sourceZone === targetZone) {
+      this.draggedCard = null;
+      return;
+    }
+
+    await this.moveCard(card.instanceId, sourceZone, targetZone, card);
+    this.draggedCard = null;
+  }
+
+  private getZoneFromElement(element: Element): CardZone | null {
+    const zone = element.closest('[class*="-zone"], [class*="-arena"]');
+    if (!zone) return null;
+
+    if (zone.classList.contains('deck-zone')) return 'deck';
+    if (zone.classList.contains('hand-zone')) return 'hand';
+    if (zone.classList.contains('discard-zone')) return 'discard';
+    if (zone.classList.contains('build-zone')) return 'build';
+    if (zone.classList.contains('space-arena')) return 'space';
+    if (zone.classList.contains('ground-arena')) return 'ground';
+    if (zone.classList.contains('character-arena')) return 'character';
+
+    return null;
+  }
+
+  private handleTouchArenaReorder(event: TouchDropEvent, card: CardInstanceDto, arena: CardZone): void {
+    if (!event.dropTarget) return;
+    
+    const targetCard = event.dropTarget.closest('.game-card[data-instanceid]');
+    const units = this.myArenaUnits(arena);
+    
+    let currentOrder = this.arenaCardOrder()[arena];
+    if (!currentOrder || currentOrder.length === 0) {
+      currentOrder = units.map((c) => c.instanceId);
+    }
+    
+    const unitIds = new Set(units.map((c) => c.instanceId));
+    currentOrder = currentOrder.filter((id) => unitIds.has(id));
+    for (const unit of units) {
+      if (!currentOrder.includes(unit.instanceId)) {
+        currentOrder.push(unit.instanceId);
+      }
+    }
+
+    const newOrder = currentOrder.filter((id) => id !== card.instanceId);
+
+    if (targetCard) {
+      const dropTargetId = targetCard.getAttribute('data-instanceid');
+      if (dropTargetId && dropTargetId !== card.instanceId) {
+        const targetIdx = newOrder.indexOf(dropTargetId);
+        if (targetIdx >= 0) {
+          newOrder.splice(targetIdx, 0, card.instanceId);
+        } else {
+          newOrder.push(card.instanceId);
+        }
+      } else {
+        newOrder.push(card.instanceId);
+      }
+    } else {
+      newOrder.push(card.instanceId);
+    }
+
+    this.arenaCardOrder.update((orders) => ({
+      ...orders,
+      [arena]: newOrder,
+    }));
+  }
+
   async toggleTap(card: CardInstanceDto): Promise<void> {
     await this.gameHub.toggleTap(card.instanceId);
   }
@@ -1651,6 +1778,15 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       this.notifications.error(result.errorMessage);
     }
     this.closeEquipmentModal();
+  }
+
+  // Teammate hand modal methods
+  openTeammateHandModal(username: string): void {
+    this.showTeammateHandModal.set(username);
+  }
+
+  closeTeammateHandModal(): void {
+    this.showTeammateHandModal.set(null);
   }
 
   // Equipment helpers

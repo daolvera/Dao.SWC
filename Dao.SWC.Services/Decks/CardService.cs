@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Dao.SWC.Core;
 using Dao.SWC.Core.CardImport;
 using Dao.SWC.Core.Decks;
@@ -8,8 +9,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Dao.SWC.Services.Decks;
 
-public class CardService(SwcDbContext dbContext, ICardImageService imageService) : ICardService
+public partial class CardService(SwcDbContext dbContext, ICardImageService imageService) : ICardService
 {
+    [GeneratedRegex("[^a-z0-9]")]
+    private static partial Regex NonAlphanumericRegex();
+
+    private static string NormalizeForSearch(string value) =>
+        NonAlphanumericRegex().Replace(value.ToLower(), "");
     public async Task<PagedResult<CardDto>> GetCardsPagedAsync(CardFilterVm? filter = null)
     {
         filter ??= new CardFilterVm();
@@ -18,14 +24,28 @@ public class CardService(SwcDbContext dbContext, ICardImageService imageService)
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            var search = filter.Search.ToLower();
-            query = filter.SearchByName ?
-                query.Where(c =>
-                    c.Name.ToLower().Contains(search)) :
-                query.Where(c =>
-                        c.CardText != null
-                        && c.CardText.ToLower().Contains(search)
-                    );
+            var normalizedSearch = NormalizeForSearch(filter.Search);
+
+            if (filter.SearchByName)
+            {
+                // Load cards and filter in memory to support normalized matching
+                // (e.g., "obiwan" matches "Obi-Wan" by stripping special characters)
+                var allCards = await query.ToListAsync();
+                var matchingIds = allCards
+                    .Where(c => NormalizeForSearch(c.Name).Contains(normalizedSearch))
+                    .Select(c => c.Id)
+                    .ToHashSet();
+
+                query = dbContext.Cards.Where(c => matchingIds.Contains(c.Id));
+            }
+            else
+            {
+                var search = filter.Search.ToLower();
+                query = query.Where(c =>
+                    c.CardText != null
+                    && c.CardText.ToLower().Contains(search)
+                );
+            }
         }
 
         if (filter.Type.HasValue)

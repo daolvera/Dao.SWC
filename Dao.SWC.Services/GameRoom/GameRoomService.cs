@@ -1701,6 +1701,38 @@ public class GameRoomService : IGameRoomService
             .ToList();
         newTop.StackedUnderIds.Add(currentTop.InstanceId);
 
+        // Transfer pilots from current top to new top
+        if (currentTop.PilotCardIds.Count > 0)
+        {
+            newTop.PilotCardIds = [.. currentTop.PilotCardIds];
+            currentTop.PilotCardIds.Clear();
+
+            // Update each pilot's reference to point to new top
+            foreach (var pilotId in newTop.PilotCardIds)
+            {
+                var pilotCard = player.Cards.FirstOrDefault(c => c.InstanceId == pilotId);
+                if (pilotCard != null)
+                {
+                    pilotCard.PilotingUnitId = newTop.InstanceId;
+                }
+            }
+        }
+
+        // Transfer equipment from current top to new top
+        if (currentTop.EquipmentCardId.HasValue)
+        {
+            var equipmentId = currentTop.EquipmentCardId.Value;
+            newTop.EquipmentCardId = equipmentId;
+            currentTop.EquipmentCardId = null;
+
+            // Update the equipment card's reference to point to new top
+            var equipmentCard = player.Cards.FirstOrDefault(c => c.InstanceId == equipmentId);
+            if (equipmentCard != null)
+            {
+                equipmentCard.EquippedToUnitId = newTop.InstanceId;
+            }
+        }
+
         // Current top becomes stacked under new top
         currentTop.StackParentId = newTop.InstanceId;
         currentTop.StackedUnderIds.Clear();

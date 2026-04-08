@@ -874,6 +874,10 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             bidToShow = canSeeBid ? player.SecretBid : null;
         }
 
+        // In team mode, teammates can see each other's hands
+        var isTeammate = isTeamMode && viewingPlayer != null && player.Team == viewingPlayer.Team;
+        var canSeeHand = isMe || isTeammate;
+
         return new GamePlayerDto(
             player.DisplayName,
             player.DeckName,
@@ -883,7 +887,7 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             player.IsConnected,
             isTeamMode && teamData != null ? teamData.Force : player.Force,
             isTeamMode && teamData != null ? teamData.BuildCounter : player.BuildCounter,
-            isMe ? player.Hand.Select(MapToCardInstanceDto) : [],
+            canSeeHand ? player.Hand.Select(MapToCardInstanceDto) : [],
             player.Hand.Count(),
             player.Deck.Count(),
             isTeamMode ? new Dictionary<string, IEnumerable<CardInstanceDto>>() :
