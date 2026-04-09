@@ -81,7 +81,6 @@ public class AuthController(
     }
 
     [HttpGet("refresh")]
-    [EnableRateLimiting(Constants.AnonymousPolicy)]
     public async Task<IActionResult> RefreshToken()
     {
         var refreshToken = Request.Cookies[Constants.Authentication.RefreshTokenCookieKey];

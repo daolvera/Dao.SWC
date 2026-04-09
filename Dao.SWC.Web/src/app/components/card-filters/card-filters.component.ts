@@ -138,7 +138,7 @@ export class CardFiltersComponent implements OnInit, OnDestroy {
   getCurrentFilter(): CardFilter {
     return {
       search: this.filter.value.search || undefined,
-      searchByName: this.filter.value.searchByName || undefined,
+      searchByName: this.filter.value.searchByName,
       type: this.filter.value.type ?? undefined,
       arena: this.filter.value.arena ?? undefined,
       alignment: this.showAlignmentFilter
