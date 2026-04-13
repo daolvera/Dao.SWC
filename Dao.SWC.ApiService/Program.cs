@@ -1,5 +1,6 @@
 using Azure.Identity;
 using Dao.SWC.ApiService.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Dao.SWC.ApiService.Hubs;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
@@ -91,7 +92,20 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.AddSqlServerDbContext<SwcDbContext>(Constants.ProjectNames.Database);
+builder.AddSqlServerDbContext<SwcDbContext>(
+    Constants.ProjectNames.Database,
+    configureDbContextOptions: options =>
+    {
+        options.UseSqlServer(sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null
+            );
+        });
+    }
+);
 
 builder.AddAzureBlobServiceClient(Constants.ProjectNames.BlobContainer);
 
