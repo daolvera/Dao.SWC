@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>bc4ac5ec-73ad-4467-8d9e-536e74b4503e</UserSecretsId>
+    <NoWarn>$(NoWarn);ASPIREACADOMAINS001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Dao.SWC.ApiService\Dao.SWC.ApiService.csproj" />
@@ -16,6 +17,7 @@
     <ProjectReference Include="..\Dao.SWC.MigrationService\Dao.SWC.MigrationService.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.AppContainers" Version="13.2.1" />
     <PackageReference Include="Aspire.Hosting.Azure.ApplicationInsights" Version="13.2.1" />
     <PackageReference Include="Aspire.Hosting.Azure.KeyVault" Version="13.2.1" />
     <PackageReference Include="Aspire.Hosting.Azure.Sql" Version="13.2.1" />

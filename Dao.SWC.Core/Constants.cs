@@ -36,6 +36,14 @@ public static class Constants
         public const string OpenAi = "swcopenai";
     }
 
+    public static class CustomDomainParameters
+    {
+        public const string ApiCustomDomain = "apiCustomDomain";
+        public const string ApiCertificateName = "apiCertificateName";
+        public const string AppCustomDomain = "appCustomDomain";
+        public const string AppCertificateName = "appCertificateName";
+    }
+
     public static class ImportOptions
     {
         public const int DefaultDelayMs = 500;
