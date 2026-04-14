@@ -78,24 +78,6 @@ var webApp = builder
     .PublishAsDockerFile()
     .WithHttpHealthCheck("/health");
 
-if (builder.ExecutionContext.IsPublishMode)
-{
-    var apiCustomDomain = builder.AddParameter(Constants.CustomDomainParameters.ApiCustomDomain);
-    var apiCertificateName = builder.AddParameter(Constants.CustomDomainParameters.ApiCertificateName);
-    var appCustomDomain = builder.AddParameter(Constants.CustomDomainParameters.AppCustomDomain);
-    var appCertificateName = builder.AddParameter(Constants.CustomDomainParameters.AppCertificateName);
-
-    apiService.PublishAsAzureContainerApp((module, app) =>
-    {
-        app.ConfigureCustomDomain(apiCustomDomain, apiCertificateName);
-    });
-
-    webApp.PublishAsAzureContainerApp((module, app) =>
-    {
-        app.ConfigureCustomDomain(appCustomDomain, appCertificateName);
-    });
-}
-
 if (builder.ExecutionContext.IsPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration[Constants.AppUrlConfigurationKey]))
 {
     apiService.WithEnvironment(
