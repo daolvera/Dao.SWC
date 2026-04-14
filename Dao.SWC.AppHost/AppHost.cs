@@ -7,7 +7,15 @@ IResourceBuilder<IResourceWithConnectionString> swcDb;
 
 if (builder.ExecutionContext.IsPublishMode)
 {
-    var azureSql = builder.AddAzureSqlServer(Constants.ProjectNames.DatabaseProvider);
+    var azureSql = builder.AddAzureSqlServer(Constants.ProjectNames.DatabaseProvider)
+        .ConfigureInfrastructure(infra =>
+        {
+            // Codify BillOverUsage so azd provision doesn't revert it to AutoPause
+            foreach (var db in infra.GetProvisionableResources().OfType<Azure.Provisioning.Sql.SqlDatabase>())
+            {
+                db.FreeLimitExhaustionBehavior = Azure.Provisioning.Sql.FreeLimitExhaustionBehavior.BillOverUsage;
+            }
+        });
     swcDb = azureSql.AddDatabase(Constants.ProjectNames.Database);
 }
 else
@@ -77,6 +85,25 @@ var webApp = builder
     .WithExternalHttpEndpoints()
     .PublishAsDockerFile()
     .WithHttpHealthCheck("/health");
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    var apiCustomDomain = builder.AddParameter(Constants.CustomDomainParameters.ApiCustomDomain);
+    var apiCertificateName = builder.AddParameter(Constants.CustomDomainParameters.ApiCertificateName);
+    var appCustomDomain = builder.AddParameter(Constants.CustomDomainParameters.AppCustomDomain);
+    var appCertificateName = builder.AddParameter(Constants.CustomDomainParameters.AppCertificateName);
+
+    builder.AddAzureContainerAppEnvironment("cae-hmvnzqjqex33y");
+    apiService.PublishAsAzureContainerApp((module, app) =>
+    {
+        app.ConfigureCustomDomain(apiCustomDomain, apiCertificateName);
+    });
+
+    webApp.PublishAsAzureContainerApp((module, app) =>
+    {
+        app.ConfigureCustomDomain(appCustomDomain, appCertificateName);
+    });
+}
 
 if (builder.ExecutionContext.IsPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration[Constants.AppUrlConfigurationKey]))
 {
