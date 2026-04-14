@@ -47,14 +47,14 @@ jobs:
         shell: pwsh
 
 
-      - name: Provision Infrastructure
-        run: azd provision --no-prompt
-        env:
-          AZURE_SWCPOSTGRES_PASSWORD: ${{ secrets.AZURE_SWCPOSTGRES_PASSWORD }}
-          AZURE_APICUSTOMDOMAIN: ${{ vars.AZURE_APICUSTOMDOMAIN }}
-          AZURE_APICERTIFICATENAME: ${{ vars.AZURE_APICERTIFICATENAME }}
-          AZURE_APPCUSTOMDOMAIN: ${{ vars.AZURE_APPCUSTOMDOMAIN }}
-          AZURE_APPCERTIFICATENAME: ${{ vars.AZURE_APPCERTIFICATENAME }}
+      # - name: Provision Infrastructure
+      #   run: azd provision --no-prompt
+      #   env:
+      #     AZURE_SWCPOSTGRES_PASSWORD: ${{ secrets.AZURE_SWCPOSTGRES_PASSWORD }}
+      #     AZURE_APICUSTOMDOMAIN: ${{ vars.AZURE_APICUSTOMDOMAIN }}
+      #     AZURE_APICERTIFICATENAME: ${{ vars.AZURE_APICERTIFICATENAME }}
+      #     AZURE_APPCUSTOMDOMAIN: ${{ vars.AZURE_APPCUSTOMDOMAIN }}
+      #     AZURE_APPCERTIFICATENAME: ${{ vars.AZURE_APPCERTIFICATENAME }}
 
       - name: Deploy Application
         run: azd deploy --no-prompt
