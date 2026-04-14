@@ -20,6 +20,9 @@
             Start Game
           </button>
         }
+        @if (isHost() && room()!.state === GameState.InProgress) {
+          <button class="btn btn-sm btn-warning" (click)="showRestartModal.set(true)">Restart Game</button>
+        }
         <button
           class="btn btn-outline-light btn-sm"
           (click)="toggleFullscreen()"
@@ -78,6 +81,32 @@
               <p class="mt-3 text-success">Ready to start!</p>
             } @else {
               <p class="mt-3 text-muted">Need at least 2 players to start</p>
+            }
+            @if (room()!.players.length > 1 && isRestartWaiting()) {
+              <div class="card mt-3">
+                <div class="card-header"><h6 class="mb-0">Select Your Deck</h6></div>
+                <div class="card-body">
+                  <select class="form-select mb-2" (change)="restartDeckIdSelect.set(+$any($event.target).value || null)">
+                    <option value="">Choose a deck...</option>
+                    @for (deck of restartValidDecks(); track deck.id) {
+                      <option [value]="deck.id">{{ deck.name }}</option>
+                    }
+                  </select>
+                  @if (restartDeckIsNeutral()) {
+                    <div class="mb-2">
+                      <div class="btn-group w-100">
+                        <input type="radio" class="btn-check" id="restartLight" name="restartAlignment" (change)="restartAlignmentSelect.set(Alignment.Light)" />
+                        <label class="btn btn-outline-primary btn-sm" for="restartLight">Light Side</label>
+                        <input type="radio" class="btn-check" id="restartDark" name="restartAlignment" (change)="restartAlignmentSelect.set(Alignment.Dark)" />
+                        <label class="btn btn-outline-dark btn-sm" for="restartDark">Dark Side</label>
+                      </div>
+                    </div>
+                  }
+                  <button class="btn btn-primary btn-sm w-100" (click)="submitRestartDeck()" [disabled]="!restartDeckIdSelect()">
+                    Confirm Deck
+                  </button>
+                </div>
+              </div>
             }
           </div>
         </div>
@@ -244,9 +273,6 @@
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
                               }
-                              @if (hasStack(card)) {
-                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
-                              }
                               @if (hasPilots(card)) {
                                 <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
                               }
@@ -373,9 +399,6 @@
                               }
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
-                              }
-                              @if (hasStack(card)) {
-                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
                               }
                               @if (hasPilots(card)) {
                                 <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
@@ -504,9 +527,6 @@
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
                               }
-                              @if (hasStack(card)) {
-                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
-                              }
                               @if (hasPilots(card)) {
                                 <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
                               }
@@ -630,9 +650,6 @@
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
                               }
-                              @if (hasStack(card)) {
-                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
-                              }
                               @if (hasPilots(card)) {
                                 <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
                               }
@@ -750,9 +767,6 @@
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
                               }
-                              @if (hasStack(card)) {
-                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
-                              }
                               @if (hasPilots(card)) {
                                 <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
                               }
@@ -869,9 +883,6 @@
                               }
                               @if (card.version) {
                                 <div class="version-badge small">{{ card.version }}</div>
-                              }
-                              @if (hasStack(card)) {
-                                <div class="stack-badge small">{{ getStackSize(card) }}</div>
                               }
                               @if (hasPilots(card)) {
                                 <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
@@ -1014,6 +1025,11 @@
                                     : openCardMenu($event, card))
                                 : openOpponentCardMenu($event, card)
                             "
+                            appTouchCard
+                            [touchDraggable]="isCardOwner(card)"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (touchDragStart)="onTouchDragStart($event, card, 'character')"
+                            (touchDragEnd)="onTouchDrop($event, card, 'character')"
                           >
                             <img
                               [src]="
@@ -1037,9 +1053,6 @@
                             }
                             @if (card.damage !== null && card.damage !== undefined) {
                               <div class="damage-badge small">{{ card.damage }}</div>
-                            }
-                            @if (hasStack(card)) {
-                              <div class="stack-badge small">{{ getStackSize(card) }}</div>
                             }
                             @if (card.version && !card.isFaceDown) {
                               <div class="version-badge small">{{ card.version }}</div>
@@ -1181,6 +1194,11 @@
                                     : openCardMenu($event, card))
                                 : openOpponentCardMenu($event, card)
                             "
+                            appTouchCard
+                            [touchDraggable]="isCardOwner(card)"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (touchDragStart)="onTouchDragStart($event, card, 'ground')"
+                            (touchDragEnd)="onTouchDrop($event, card, 'ground')"
                           >
                             <img
                               [src]="
@@ -1204,9 +1222,6 @@
                             }
                             @if (card.damage !== null && card.damage !== undefined) {
                               <div class="damage-badge small">{{ card.damage }}</div>
-                            }
-                            @if (hasStack(card)) {
-                              <div class="stack-badge small">{{ getStackSize(card) }}</div>
                             }
                             @if (hasPilots(card)) {
                               <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
@@ -1351,6 +1366,11 @@
                                     : openCardMenu($event, card))
                                 : openOpponentCardMenu($event, card)
                             "
+                            appTouchCard
+                            [touchDraggable]="isCardOwner(card)"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (touchDragStart)="onTouchDragStart($event, card, 'space')"
+                            (touchDragEnd)="onTouchDrop($event, card, 'space')"
                           >
                             <img
                               [src]="
@@ -1374,9 +1394,6 @@
                             }
                             @if (card.damage !== null && card.damage !== undefined) {
                               <div class="damage-badge small">{{ card.damage }}</div>
-                            }
-                            @if (hasStack(card)) {
-                              <div class="stack-badge small">{{ getStackSize(card) }}</div>
                             }
                             @if (hasPilots(card)) {
                               <div class="pilot-badge small">P{{ card.pilotCardIds.length }}</div>
@@ -1528,13 +1545,15 @@
               </button>
             </div>
             <div class="hand-cards">
-              @for (card of myHandSorted(); track card.instanceId) {
+              @for (card of myHandSortedWithOrder(); track card.instanceId; let i = $index) {
                 <div
                   class="game-card hand-card"
                   [class.sideways]="card.cardType !== 0"
                   [class.selected]="selectedCard() === card.instanceId"
                   [attr.draggable]="card.cardType !== 2"
-                  (dragstart)="card.cardType !== 2 ? onDragStart($event, card, 'hand') : $event.preventDefault()"
+                  (dragstart)="card.cardType !== 2 ? onHandCardDragStart($event, card, i) : $event.preventDefault()"
+                  (dragover)="onHandCardDragOver($event, i)"
+                  (drop)="onHandCardDrop($event, card)"
                   (dragend)="onDragEnd()"
                   (click)="selectCard(card.instanceId)"
                   (dblclick)="zoomCard.set(card)"
@@ -1676,13 +1695,28 @@
         @if (showDeckBrowser()) {
           <div class="modal-overlay" (click)="showDeckBrowser.set(false)">
             <div class="modal-content large" (click)="$event.stopPropagation()">
-              <h4>Browse Deck ({{ deckBrowserCards().length }} cards)</h4>
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <h4 class="mb-0">Browse Deck ({{ deckBrowserCards().length }} cards)</h4>
+                <div class="d-flex align-items-center gap-2">
+                  <label class="form-label mb-0 small">Show top:</label>
+                  <input
+                    type="number"
+                    class="form-control form-control-sm"
+                    style="width: 80px"
+                    [value]="deckBrowserTopX() ?? ''"
+                    (input)="deckBrowserTopX.set($any($event.target).value ? +$any($event.target).value : null)"
+                    placeholder="All"
+                    min="1"
+                  />
+                </div>
+              </div>
               <div class="modal-cards scrollable">
-                @for (card of deckBrowserCards(); track card.instanceId) {
+                @for (card of deckBrowserFiltered(); track card.instanceId) {
                   <div
                     class="game-card clickable"
                     [class.sideways]="card.cardType !== 0"
                     (click)="takeCardFromDeck(card.instanceId)"
+                    (contextmenu)="openDeckCardMenu($event, card)"
                     [title]="'Click to take ' + card.cardName + ' to hand'"
                   >
                     <img
@@ -1706,6 +1740,21 @@
         }
 
         <!-- Card Context Menu (for cards in play) -->
+        @if (deckCardMenuCard()) {
+          <div
+            class="context-menu"
+            [style.left.px]="cardMenuX()"
+            [style.top.px]="cardMenuY()"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="context-menu-content">
+              <button class="context-menu-item" (click)="zoomFromDeckMenu()">Zoom</button>
+              <button class="context-menu-item" (click)="takeFromDeckMenu()">Take to Hand</button>
+            </div>
+          </div>
+          <div class="context-menu-backdrop" (click)="closeDeckCardMenu()"></div>
+        }
+
         @if (cardMenuCard()) {
           <div
             class="context-menu"
@@ -1748,6 +1797,7 @@
               <button class="context-menu-item" (click)="returnToHandFromMenu()">
                 Return to Hand
               </button>
+              <button class="context-menu-item" (click)="putOnBottomOfDeckFromMenu()">Put on Bottom of Deck</button>
               <!-- Pilot cards in Character arena can be attached to units in Space/Ground -->
               @if (cardMenuCard()!.isPilot && cardMenuCard()!.cardArena?.toLowerCase() === 'character') {
                 <hr class="context-menu-divider" />
@@ -1818,6 +1868,8 @@
             (click)="$event.stopPropagation()"
           >
             <div class="context-menu-content">
+              <button class="context-menu-item" (click)="zoomFromHandMenu()">Zoom</button>
+              <hr class="context-menu-divider" />
               <!-- Pilot cards: Can play to Character arena OR attach to Space/Ground units -->
               @if (handCardMenuCard()!.isPilot) {
                 <div class="context-menu-label">Play to:</div>
@@ -1884,6 +1936,9 @@
               <button class="context-menu-item" (click)="moveToBuildFromHandMenu()">
                 Move to Build Zone
               </button>
+              <hr class="context-menu-divider" />
+              <button class="context-menu-item" (click)="discardFromHandMenu()">Discard</button>
+              <button class="context-menu-item" (click)="putOnBottomOfDeckFromHandMenu()">Put on Bottom of Deck</button>
             </div>
           </div>
           <div class="context-menu-backdrop" (click)="closeHandCardMenu()"></div>
@@ -2007,6 +2062,8 @@
                   </button>
                 }
               }
+              <hr class="context-menu-divider" />
+              <button class="context-menu-item" (click)="moveFromBuildToHandFromMenu()">Move to Hand</button>
             </div>
           </div>
           <div class="context-menu-backdrop" (click)="closeBuildCardMenu()"></div>
@@ -2150,8 +2207,7 @@
                   <div
                     class="game-card"
                     [class.sideways]="card.cardType !== 0"
-                    (dblclick)="zoomCard.set(card)"
-                    (contextmenu)="openOpponentCardMenu($event, card)"
+                    (contextmenu)="$event.preventDefault()"
                   >
                     <img src="assets/card-back.jpg" alt="Face Down Card" />
                     @if (card.counter !== null && card.counter !== undefined) {
@@ -2184,8 +2240,7 @@
                   <div
                     class="game-card"
                     [class.sideways]="card.cardType !== 0"
-                    (dblclick)="zoomCard.set(card)"
-                    (contextmenu)="openOpponentCardMenu($event, card)"
+                    (contextmenu)="$event.preventDefault()"
                   >
                     <img src="assets/card-back.jpg" alt="Face Down Card" />
                     @if (card.counter !== null && card.counter !== undefined) {
@@ -2225,6 +2280,19 @@
           </div>
         }
 
+        @if (showRestartModal()) {
+          <div class="modal-overlay" (click)="showRestartModal.set(false)">
+            <div class="modal-content" (click)="$event.stopPropagation()" style="max-width: 400px">
+              <h4>Restart Game?</h4>
+              <p>The game will be reset. All players will keep their spots but must pick new decks before the game can start again.</p>
+              <div class="d-flex gap-2 justify-content-end mt-3">
+                <button class="btn btn-secondary" (click)="showRestartModal.set(false)">Cancel</button>
+                <button class="btn btn-warning" (click)="confirmRestartGame()">Restart</button>
+              </div>
+            </div>
+          </div>
+        }
+
         <!-- Side Panel -->
         <div class="side-panel" [class.collapsed]="sidePanelCollapsed()">
           <button class="panel-toggle" (click)="sidePanelCollapsed.set(!sidePanelCollapsed())">
@@ -2243,6 +2311,20 @@
                   <button class="btn btn-sm btn-outline-primary" (click)="openDeckBrowser()">
                     View Deck
                   </button>
+                  <div class="input-group input-group-sm">
+                    <input
+                      type="number"
+                      class="form-control"
+                      [value]="viewTopXInput()"
+                      (input)="viewTopXInput.set(+$any($event.target).value || 3)"
+                      min="1"
+                      placeholder="3"
+                    />
+                    <button class="btn btn-outline-primary" (click)="openDeckBrowserTopX()">View Top X</button>
+                  </div>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="shuffleDeck()">Shuffle Deck</button>
+                  <button class="btn btn-sm btn-outline-warning" (click)="untapAll()">Untap All</button>
+                  <button class="btn btn-sm btn-outline-danger" (click)="discardBattleAndMissionCards()">Discard Battle/Mission</button>
                 </div>
               </div>
 

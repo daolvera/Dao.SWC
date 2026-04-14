@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace Dao.SWC.ApiService.Extensions;
@@ -7,7 +7,7 @@ public static class ClaimsPrincipalExtensions
 {
     extension(ClaimsPrincipal principal)
     {
-        public string? GetAppUserId()
+        public string GetAppUserId()
         {
             // Check for NameIdentifier first (most common in .NET Identity)
             var claim = principal
@@ -22,7 +22,7 @@ public static class ClaimsPrincipalExtensions
                 .Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)
                 ?.Value;
 
-            return claim;
+            return claim ?? throw new InvalidOperationException("App user ID not found.");
         }
     }
 }

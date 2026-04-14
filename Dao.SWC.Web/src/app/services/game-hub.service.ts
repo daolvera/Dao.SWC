@@ -167,6 +167,7 @@ export class GameHubService {
       playAsAlignment ?? null,
     );
     this._currentRoomCode = roomCode;
+    localStorage.setItem('swc_last_room_code', roomCode);
     return roomCode;
   }
 
@@ -194,6 +195,7 @@ export class GameHubService {
 
     this._currentRoomCode = roomCode;
     this._currentUser = this.extractUsername(room);
+    localStorage.setItem('swc_last_room_code', roomCode);
     this.roomUpdated$.next(room);
   }
 
@@ -202,6 +204,7 @@ export class GameHubService {
     const room = await this.hubConnection.invoke<GameRoomDto>('Reconnect', roomCode);
     this._currentRoomCode = roomCode;
     this._currentUser = this.extractUsername(room);
+    localStorage.setItem('swc_last_room_code', roomCode);
     this.roomUpdated$.next(room);
   }
 
@@ -209,6 +212,7 @@ export class GameHubService {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('LeaveRoom', this._currentRoomCode);
     this._currentRoomCode = null;
+    localStorage.removeItem('swc_last_room_code');
   }
 
   async kickPlayer(username: string): Promise<void> {
@@ -332,6 +336,36 @@ export class GameHubService {
   async updateBuildCounter(buildCounter: number): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('UpdateBuildCounter', buildCounter);
+  }
+
+  async moveFromBuildToHand(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('MoveFromBuildToHand', cardInstanceId);
+  }
+
+  async untapAll(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('UntapAll');
+  }
+
+  async putOnBottomOfDeck(cardInstanceId: string): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('PutOnBottomOfDeck', cardInstanceId);
+  }
+
+  async discardBattleAndMissionCards(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('DiscardBattleAndMissionCards');
+  }
+
+  async restartGame(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('RestartGame');
+  }
+
+  async selectRestartDeck(deckId: number, playAsAlignment?: Alignment): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('SelectRestartDeck', deckId, playAsAlignment ?? null);
   }
 
   // Card Stacking methods

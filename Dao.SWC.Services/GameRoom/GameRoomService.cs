@@ -12,8 +12,6 @@ public class GameRoomService : IGameRoomService
     private readonly ConcurrentDictionary<string, Core.GameRoom.GameRoom> _rooms;
     private readonly SwcDbContext _dbContext;
     private readonly ICardImageService _imageService;
-    private static readonly Random _random = new();
-
     public GameRoomService(
         SwcDbContext dbContext,
         IGameRoomStorage storage,
@@ -319,7 +317,7 @@ public class GameRoomService : IGameRoomService
         // Set up turn order (alternate teams)
         room.TurnOrder = room
             .Players.OrderBy(p => p.Team)
-            .ThenBy(_ => _random.Next())
+            .ThenBy(_ => Random.Shared.Next())
             .Select(p => p.UserId)
             .ToList();
 
@@ -793,7 +791,7 @@ public class GameRoomService : IGameRoomService
         var results = new int[numberOfDice];
         for (int i = 0; i < numberOfDice; i++)
         {
-            results[i] = _random.Next(1, 7); // d6
+            results[i] = Random.Shared.Next(1, 7); // d6
         }
 
         var rollResult = new DiceRollResult(
@@ -1455,6 +1453,197 @@ public class GameRoomService : IGameRoomService
         return Task.FromResult(true);
     }
 
+    public Task<Core.GameRoom.GameRoom?> MoveFromBuildToHandAsync(string roomCode, string userId, Guid cardInstanceId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId && c.Zone == CardZone.BuildZone
+        );
+        if (card == null)
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        card.Zone = CardZone.Hand;
+        card.IsFaceDown = false;
+        card.OwnerUserId = null;
+
+        return Task.FromResult<Core.GameRoom.GameRoom?>(room);
+    }
+
+    public Task<Core.GameRoom.GameRoom?> UntapAllAsync(string roomCode, string userId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        IEnumerable<CardInstance> playAreaCards;
+        if (room.IsTeamMode)
+        {
+            playAreaCards = room.GetPlayersOnTeam(player.Team)
+                .SelectMany(p => p.Cards)
+                .Where(c => c.Zone == CardZone.PlayArea);
+        }
+        else
+        {
+            playAreaCards = player.Cards.Where(c => c.Zone == CardZone.PlayArea);
+        }
+
+        foreach (var card in playAreaCards)
+        {
+            card.IsTapped = false;
+        }
+
+        return Task.FromResult<Core.GameRoom.GameRoom?>(room);
+    }
+
+    public Task<Core.GameRoom.GameRoom?> PutOnBottomOfDeckAsync(string roomCode, string userId, Guid cardInstanceId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        var card = player.Cards.FirstOrDefault(c =>
+            c.InstanceId == cardInstanceId
+            && (c.Zone == CardZone.Hand || c.Zone == CardZone.PlayArea || c.Zone == CardZone.BuildZone)
+        );
+        if (card == null)
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        // Clear all arena/game-state properties
+        card.Zone = CardZone.Deck;
+        card.IsTapped = false;
+        card.IsRetreated = false;
+        card.IsFaceDown = false;
+        card.Counter = null;
+        card.Damage = null;
+        card.Arena = null;
+        card.ZonePosition = null;
+        card.OwnerUserId = null;
+
+        // Move the card to the bottom of the deck (after all existing deck cards)
+        player.Cards.Remove(card);
+        var lastDeckIndex = player.Cards.FindLastIndex(c => c.Zone == CardZone.Deck);
+        if (lastDeckIndex >= 0)
+            player.Cards.Insert(lastDeckIndex + 1, card);
+        else
+            player.Cards.Insert(0, card);
+
+        return Task.FromResult<Core.GameRoom.GameRoom?>(room);
+    }
+
+    public Task<Core.GameRoom.GameRoom?> DiscardBattleAndMissionCardsAsync(string roomCode, string userId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        IEnumerable<CardInstance> allCards;
+        if (room.IsTeamMode)
+        {
+            allCards = room.GetPlayersOnTeam(player.Team).SelectMany(p => p.Cards);
+        }
+        else
+        {
+            allCards = player.Cards;
+        }
+
+        var cardsToDiscard = allCards
+            .Where(c =>
+                c.Zone == CardZone.PlayArea
+                && (c.CardType == CardType.Battle || c.CardType == CardType.Mission)
+            )
+            .ToList();
+
+        foreach (var card in cardsToDiscard)
+        {
+            card.Zone = CardZone.Discard;
+            card.IsTapped = false;
+            card.IsRetreated = false;
+            card.IsFaceDown = false;
+            card.Counter = null;
+            card.Damage = null;
+            card.Arena = null;
+            card.ZonePosition = null;
+        }
+
+        return Task.FromResult<Core.GameRoom.GameRoom?>(room);
+    }
+
+    public Task<Core.GameRoom.GameRoom?> RestartGameAsync(string roomCode, string hostUserId)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        if (!room.IsHost(hostUserId))
+            return Task.FromResult<Core.GameRoom.GameRoom?>(null);
+
+        room.State = GameState.Waiting;
+        room.CurrentTurnUserId = null;
+        room.TurnOrder.Clear();
+        room.TurnNumber = 0;
+        room.StartedAt = null;
+        room.BidsRevealed = false;
+        room.DiceRolls.Clear();
+        room.Teams.Clear();
+
+        foreach (var player in room.Players)
+        {
+            player.Cards.Clear();
+            player.Force = 4;
+            player.BuildCounter = room.RoomType == RoomType.OneVsOne ? 30 : 60;
+            player.DeckId = 0;
+            player.DeckName = string.Empty;
+            player.SpaceArenaRetreated = false;
+            player.GroundArenaRetreated = false;
+            player.CharacterArenaRetreated = false;
+            player.SecretBid = null;
+        }
+
+        return Task.FromResult<Core.GameRoom.GameRoom?>(room);
+    }
+
+    public async Task<Core.GameRoom.GameRoom?> SelectRestartDeckAsync(
+        string roomCode,
+        string userId,
+        int deckId,
+        Alignment? playAsAlignment
+    )
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+            return null;
+
+        if (room.State != GameState.Waiting)
+            return null;
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+            return null;
+
+        var deck = await _dbContext.Decks.AsNoTracking().FirstOrDefaultAsync(d => d.Id == deckId);
+        if (deck == null)
+            return null;
+
+        player.DeckId = deckId;
+        player.DeckAlignment = deck.Alignment;
+        player.PlayAsAlignment = playAsAlignment;
+
+        return room;
+    }
+
     #region Private Helpers
 
     private static string GenerateRoomCode()
@@ -1463,7 +1652,7 @@ public class GameRoomService : IGameRoomService
         var code = new char[6];
         for (int i = 0; i < 6; i++)
         {
-            code[i] = chars[_random.Next(chars.Length)];
+            code[i] = chars[Random.Shared.Next(chars.Length)];
         }
         return new string(code);
     }
@@ -1531,7 +1720,7 @@ public class GameRoomService : IGameRoomService
         // Fisher-Yates shuffle
         for (int i = deckCards.Count - 1; i > 0; i--)
         {
-            int j = _random.Next(i + 1);
+            int j = Random.Shared.Next(i + 1);
             (deckCards[i], deckCards[j]) = (deckCards[j], deckCards[i]);
         }
 
@@ -1732,6 +1921,14 @@ public class GameRoomService : IGameRoomService
                 equipmentCard.EquippedToUnitId = newTop.InstanceId;
             }
         }
+
+        // Transfer counter from current top to new top
+        newTop.Counter = currentTop.Counter;
+        currentTop.Counter = null;
+
+        // Transfer damage from current top to new top
+        newTop.Damage = currentTop.Damage;
+        currentTop.Damage = null;
 
         // Current top becomes stacked under new top
         currentTop.StackParentId = newTop.InstanceId;

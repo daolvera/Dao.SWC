@@ -1304,6 +1304,108 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
 
     #endregion
 
+    #region Game Actions
+
+    /// <summary>
+    /// Move a card from build zone back to hand.
+    /// </summary>
+    public async Task MoveFromBuildToHand(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var room = await gameRoomService.MoveFromBuildToHandAsync(roomCode, userId, instanceGuid);
+        if (room != null)
+            await SendRoomUpdateToGroupAsync(room);
+    }
+
+    /// <summary>
+    /// Untap all cards in the player's (or team's) play area.
+    /// </summary>
+    public async Task UntapAll()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var room = await gameRoomService.UntapAllAsync(roomCode, userId);
+        if (room != null)
+            await SendRoomUpdateToGroupAsync(room);
+    }
+
+    /// <summary>
+    /// Put a card on the bottom of the player's deck.
+    /// </summary>
+    public async Task PutOnBottomOfDeck(string cardInstanceId)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        if (!Guid.TryParse(cardInstanceId, out var instanceGuid))
+            return;
+
+        var room = await gameRoomService.PutOnBottomOfDeckAsync(roomCode, userId, instanceGuid);
+        if (room != null)
+            await SendRoomUpdateToGroupAsync(room);
+    }
+
+    /// <summary>
+    /// Discard all Battle and Mission cards from the player's (or team's) play area.
+    /// </summary>
+    public async Task DiscardBattleAndMissionCards()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var room = await gameRoomService.DiscardBattleAndMissionCardsAsync(roomCode, userId);
+        if (room != null)
+            await SendRoomUpdateToGroupAsync(room);
+    }
+
+    /// <summary>
+    /// Reset the game to Waiting state (host only).
+    /// </summary>
+    public async Task RestartGame()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var room = await gameRoomService.RestartGameAsync(roomCode, userId);
+        if (room != null)
+            await SendRoomUpdateToGroupAsync(room);
+    }
+
+    /// <summary>
+    /// Select a deck for the upcoming restarted game.
+    /// </summary>
+    public async Task SelectRestartDeck(int deckId, Alignment? playAsAlignment = null)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var room = await gameRoomService.SelectRestartDeckAsync(roomCode, userId, deckId, playAsAlignment);
+        if (room != null)
+            await SendRoomUpdateToGroupAsync(room);
+        else
+            await Clients.Caller.SendAsync("Error", "Failed to select deck for restart");
+    }
+
+    #endregion
+
     #region Bidding
 
     /// <summary>

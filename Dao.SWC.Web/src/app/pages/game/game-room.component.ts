@@ -26,6 +26,8 @@ import {
   TeamDataDto,
 } from '../../models/dtos/game.dto';
 import { Alignment } from '../../models/dtos/card.dto';
+import { DeckListItemDto } from '../../models/dtos/deck.dto';
+import { DeckService } from '../../services/deck.service';
 import { GameHubService } from '../../services/game-hub.service';
 import { NotificationService } from '../../services/notification.service';
 import { NotificationsComponent } from '../../components/notifications/notifications.component';
@@ -61,6 +63,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private gameHub = inject(GameHubService);
   private notifications = inject(NotificationService);
+  private deckService = inject(DeckService);
 
   roomCode = '';
   room = signal<GameRoomDto | null>(null);
@@ -73,6 +76,22 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   showDiscard = signal(false);
   showDeckBrowser = signal(false);
   deckBrowserCards = signal<CardInstanceDto[]>([]);
+  deckBrowserTopX = signal<number | null>(null);
+
+  deckBrowserFiltered = computed(() => {
+    const cards = this.deckBrowserCards();
+    const topX = this.deckBrowserTopX();
+    if (topX === null || topX <= 0) return cards;
+    return cards.slice(0, topX);
+  });
+
+  deckCardMenuCardId = signal<string | null>(null);
+
+  deckCardMenuCard = computed(() => {
+    const id = this.deckCardMenuCardId();
+    if (!id) return null;
+    return this.deckBrowserCards().find(c => c.instanceId === id) ?? null;
+  });
   dragOverZone = signal<CardZone | null>(null);
   handMinimized = signal(false);
   bottomControlsCollapsed = signal(false);
@@ -205,6 +224,22 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   // Teammate hand modal state
   showTeammateHandModal = signal<string | null>(null); // username of teammate to show
+
+  // Restart game state
+  showRestartModal = signal(false);
+  isRestartWaiting = signal(false);
+  restartValidDecks = signal<DeckListItemDto[]>([]);
+  restartDeckIdSelect = signal<number | null>(null);
+  restartAlignmentSelect = signal<Alignment | null>(null);
+
+  restartDeckIsNeutral = computed(() => {
+    const id = this.restartDeckIdSelect();
+    if (!id) return false;
+    return this.restartValidDecks().find(d => d.id === id)?.alignment === Alignment.Neutral;
+  });
+
+  // Hand card order (client-side reordering)
+  handCardOrder = signal<string[]>([]);
 
   teammateHandPlayer = computed(() => {
     const username = this.showTeammateHandModal();
@@ -464,6 +499,20 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     return [...units, ...nonUnits];
   });
 
+  // Hand sorted respecting client-side card order
+  myHandSortedWithOrder = computed(() => {
+    const sorted = this.myHandSorted();
+    const order = this.handCardOrder();
+    if (order.length === 0) return sorted;
+
+    const orderMap = new Map(order.map((id, i) => [id, i]));
+    return [...sorted].sort((a, b) => {
+      const aIdx = orderMap.has(a.instanceId) ? orderMap.get(a.instanceId)! : 999;
+      const bIdx = orderMap.has(b.instanceId) ? orderMap.get(b.instanceId)! : 999;
+      return aIdx - bIdx;
+    });
+  });
+
   myDeckSize = computed(() => {
     const me = this.myPlayer();
     return me?.deckSize ?? 0;
@@ -543,6 +592,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
       this.gameHub.roomUpdated$.subscribe((room) => {
         if (room.roomCode === this.roomCode) {
           this.room.set(room);
+          // Clear restart-waiting flag once the game goes back in progress
+          if (room.state === GameState.InProgress) {
+            this.isRestartWaiting.set(false);
+          }
         }
       }),
       this.gameHub.diceRolled$.subscribe((event) => {
@@ -564,6 +617,9 @@ export class GameRoomComponent implements OnInit, OnDestroy {
           }
         }, 0);
       }),
+      this.deckService.getUserDecks().subscribe(decks =>
+        this.restartValidDecks.set(decks.filter(d => d.isValid))
+      ),
     );
 
     this.reconnect();
@@ -934,12 +990,101 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     }
   }
 
+  async moveFromBuildToHandFromMenu(): Promise<void> {
+    const card = this.buildCardMenuCard();
+    if (card) {
+      this.closeBuildCardMenu();
+      await this.gameHub.moveFromBuildToHand(card.instanceId);
+    }
+  }
+
+  async discardFromHandMenu(): Promise<void> {
+    const card = this.handCardMenuCard();
+    if (card) {
+      this.closeHandCardMenu();
+      await this.gameHub.discardCard(card.instanceId);
+    }
+  }
+
+  async putOnBottomOfDeckFromMenu(): Promise<void> {
+    const card = this.cardMenuCard();
+    if (card) {
+      this.closeCardMenu();
+      await this.gameHub.putOnBottomOfDeck(card.instanceId);
+    }
+  }
+
+  async putOnBottomOfDeckFromHandMenu(): Promise<void> {
+    const card = this.handCardMenuCard();
+    if (card) {
+      this.closeHandCardMenu();
+      await this.gameHub.putOnBottomOfDeck(card.instanceId);
+    }
+  }
+
+  // Arena retreat methods
+  async untapAll(): Promise<void> {
+    await this.gameHub.untapAll();
+  }
+
+  async discardBattleAndMissionCards(): Promise<void> {
+    await this.gameHub.discardBattleAndMissionCards();
+  }
+
+  // Restart game methods
+  async confirmRestartGame(): Promise<void> {
+    this.showRestartModal.set(false);
+    this.isRestartWaiting.set(true);
+    await this.gameHub.restartGame();
+  }
+
+  async submitRestartDeck(): Promise<void> {
+    const deckId = this.restartDeckIdSelect();
+    if (!deckId) return;
+    if (this.restartDeckIsNeutral() && !this.restartAlignmentSelect()) return;
+    await this.gameHub.selectRestartDeck(deckId, this.restartAlignmentSelect() ?? undefined);
+  }
+
+  // Hand drag-and-drop reorder handlers
+  onHandCardDragStart(event: DragEvent, card: CardInstanceDto, index: number): void {
+    this.onDragStart(event, card, 'hand');
+  }
+
+  onHandCardDragOver(event: DragEvent, targetIndex: number): void {
+    if (this.draggedCard?.sourceZone === 'hand') {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  onHandCardDrop(event: DragEvent, targetCard: CardInstanceDto): void {
+    const dragged = this.draggedCard;
+    if (!dragged || dragged.sourceZone !== 'hand') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentOrder = this.myHandSortedWithOrder();
+    const fromIndex = currentOrder.findIndex(c => c.instanceId === dragged.card.instanceId);
+    const toIndex = currentOrder.findIndex(c => c.instanceId === targetCard.instanceId);
+
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+      this.onDragEnd();
+      return;
+    }
+
+    const newOrder = currentOrder.map(c => c.instanceId);
+    newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, dragged.card.instanceId);
+
+    this.handCardOrder.set(newOrder);
+    this.onDragEnd();
+  }
+
   // Arena retreat methods
   async toggleArenaRetreat(arena: string): Promise<void> {
     await this.gameHub.toggleArenaRetreat(arena);
   }
-
-  // Individual card retreat
   async toggleCardRetreatFromMenu(): Promise<void> {
     const card = this.cardMenuCard();
     if (card) {
@@ -1024,12 +1169,49 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   async openDeckBrowser(): Promise<void> {
     const cards = await this.gameHub.viewDeck();
     this.deckBrowserCards.set(cards);
+    this.deckBrowserTopX.set(null);
+    this.showDeckBrowser.set(true);
+  }
+
+  viewTopXInput = signal<number>(3);
+
+  async openDeckBrowserTopX(): Promise<void> {
+    const cards = await this.gameHub.viewDeck();
+    this.deckBrowserCards.set(cards);
+    this.deckBrowserTopX.set(this.viewTopXInput());
     this.showDeckBrowser.set(true);
   }
 
   async takeCardFromDeck(cardInstanceId: string): Promise<void> {
     await this.gameHub.takeFromDeck(cardInstanceId);
     this.showDeckBrowser.set(false);
+  }
+
+  openDeckCardMenu(event: MouseEvent, card: CardInstanceDto): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.deckCardMenuCardId.set(card.instanceId);
+    this.setMenuPosition(event.clientX, event.clientY);
+  }
+
+  closeDeckCardMenu(): void {
+    this.deckCardMenuCardId.set(null);
+  }
+
+  zoomFromDeckMenu(): void {
+    const card = this.deckCardMenuCard();
+    if (card) {
+      this.zoomCard.set(card);
+      this.closeDeckCardMenu();
+    }
+  }
+
+  async takeFromDeckMenu(): Promise<void> {
+    const card = this.deckCardMenuCard();
+    if (card) {
+      this.closeDeckCardMenu();
+      await this.takeCardFromDeck(card.instanceId);
+    }
   }
 
   // Drag and drop
@@ -1310,6 +1492,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     await this.gameHub.drawCards(7);
   }
 
+  async shuffleDeck(): Promise<void> {
+    await this.gameHub.shuffleDeck();
+  }
+
   async rollDice(): Promise<void> {
     const count = this.diceCount.value ?? 1;
     await this.gameHub.rollDice(count);
@@ -1438,6 +1624,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     if (card) {
       this.zoomCard.set(card);
       this.closeCardMenu();
+    }
+  }
+
+  zoomFromHandMenu(): void {
+    const card = this.handCardMenuCard();
+    if (card) {
+      this.zoomCard.set(card);
+      this.closeHandCardMenu();
     }
   }
 

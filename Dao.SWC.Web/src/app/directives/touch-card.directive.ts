@@ -69,10 +69,7 @@ export class TouchCardDirective implements OnDestroy {
     this.isDragging = false;
     this.longPressTriggered = false;
 
-    // Prevent default to stop iOS context menu
-    event.preventDefault();
-
-    // Start long press timer
+    // Start long press timer (no preventDefault here — allows native scroll)
     this.longPressTimer = setTimeout(() => {
       this.longPressTriggered = true;
       this.longPress.emit({

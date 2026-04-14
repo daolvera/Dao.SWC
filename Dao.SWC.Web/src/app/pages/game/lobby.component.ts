@@ -21,6 +21,16 @@ import { GameHubService } from '../../services/game-hub.service';
     <div class="container py-4">
       <h1 class="mb-4">Game Lobby</h1>
 
+      @if (showRejoinAlert()) {
+        <div class="alert alert-info alert-dismissible d-flex align-items-center gap-3 mb-4">
+          <span>You were previously in game room <strong>{{ pendingRejoinCode() }}</strong>. Would you like to rejoin?</span>
+          <div class="d-flex gap-2 ms-auto flex-shrink-0">
+            <button class="btn btn-sm btn-primary" (click)="rejoinGame()">Rejoin</button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="dismissRejoin()">Dismiss</button>
+          </div>
+        </div>
+      }
+
       @if (error()) {
         <div class="alert alert-danger alert-dismissible">
           {{ error() }}
@@ -249,6 +259,8 @@ export class LobbyComponent implements OnInit {
   creating = signal(false);
   joining = signal(false);
   error = signal<string | null>(null);
+  showRejoinAlert = signal(false);
+  pendingRejoinCode = signal<string | null>(null);
 
   // Track selected deck for neutral detection
   createSelectedDeckId = signal<number | null>(null);
@@ -308,6 +320,11 @@ export class LobbyComponent implements OnInit {
   private async connectToHub(): Promise<void> {
     try {
       await this.gameHub.connect();
+      const savedCode = localStorage.getItem('swc_last_room_code');
+      if (savedCode) {
+        this.pendingRejoinCode.set(savedCode);
+        this.showRejoinAlert.set(true);
+      }
     } catch {
       this.error.set('Failed to connect to game server');
     }
@@ -395,5 +412,26 @@ export class LobbyComponent implements OnInit {
       this.error.set(err instanceof Error ? err.message : 'Failed to join room');
       this.joining.set(false);
     }
+  }
+
+  async rejoinGame(): Promise<void> {
+    const code = this.pendingRejoinCode();
+    if (!code) return;
+    this.showRejoinAlert.set(false);
+    try {
+      await this.gameHub.connect();
+      await this.gameHub.reconnect(code);
+      this.router.navigate(['/play', code]);
+    } catch {
+      localStorage.removeItem('swc_last_room_code');
+      this.pendingRejoinCode.set(null);
+      this.error.set('Could not rejoin game — the room may no longer exist.');
+    }
+  }
+
+  dismissRejoin(): void {
+    localStorage.removeItem('swc_last_room_code');
+    this.pendingRejoinCode.set(null);
+    this.showRejoinAlert.set(false);
   }
 }

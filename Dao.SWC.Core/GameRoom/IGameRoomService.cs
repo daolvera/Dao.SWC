@@ -280,6 +280,41 @@ public interface IGameRoomService
         string arena
     );
 
+    /// <summary>
+    /// Move a card from build zone back to hand.
+    /// </summary>
+    Task<GameRoom?> MoveFromBuildToHandAsync(string roomCode, string userId, Guid cardInstanceId);
+
+    /// <summary>
+    /// Untap all cards in the player's (or team's) play area.
+    /// </summary>
+    Task<GameRoom?> UntapAllAsync(string roomCode, string userId);
+
+    /// <summary>
+    /// Put a card on the bottom of the player's deck.
+    /// </summary>
+    Task<GameRoom?> PutOnBottomOfDeckAsync(string roomCode, string userId, Guid cardInstanceId);
+
+    /// <summary>
+    /// Discard all Battle and Mission cards from the player's (or team's) play area.
+    /// </summary>
+    Task<GameRoom?> DiscardBattleAndMissionCardsAsync(string roomCode, string userId);
+
+    /// <summary>
+    /// Reset the game to Waiting state (host only). Clears all player cards and counters.
+    /// </summary>
+    Task<GameRoom?> RestartGameAsync(string roomCode, string hostUserId);
+
+    /// <summary>
+    /// Select a deck for the upcoming restarted game.
+    /// </summary>
+    Task<GameRoom?> SelectRestartDeckAsync(
+        string roomCode,
+        string userId,
+        int deckId,
+        Alignment? playAsAlignment
+    );
+
     #region Card Stacking (Versioned Units)
 
     /// <summary>

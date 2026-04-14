@@ -1,6 +1,5 @@
 using Azure.Identity;
 using Dao.SWC.ApiService.Extensions;
-using Microsoft.EntityFrameworkCore;
 using Dao.SWC.ApiService.Hubs;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
@@ -14,6 +13,7 @@ using Dao.SWC.Services.DeckImport;
 using Dao.SWC.Services.Decks;
 using Dao.SWC.Services.GameRoom;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,7 +33,9 @@ if (
         {
             if (!string.IsNullOrEmpty(managedIdentityClientId))
             {
-                settings.Credential = new ManagedIdentityCredential(managedIdentityClientId);
+                settings.Credential = new ManagedIdentityCredential(
+                    new ManagedIdentityCredentialOptions(ManagedIdentityId.FromUserAssignedClientId(managedIdentityClientId))
+                );
             }
         }
     );
