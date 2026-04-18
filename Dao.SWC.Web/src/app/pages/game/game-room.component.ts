@@ -1549,11 +1549,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   }
 
   // Touch event handlers for iPad/mobile support
-  onTouchLongPress(event: TouchDragEvent, card: CardInstanceDto, menuType: 'card' | 'hand' | 'build' | 'discard' | 'opponent'): void {
+  onTouchLongPress(event: TouchDragEvent, card: CardInstanceDto, menuType: 'card' | 'stack' | 'hand' | 'build' | 'discard' | 'opponent'): void {
     switch (menuType) {
       case 'card':
         this.cardMenuCardId.set(card.instanceId);
         this.setMenuPosition(event.clientX, event.clientY);
+        break;
+      case 'stack':
+        this.openStackMenuFromTouch(event, card);
         break;
       case 'hand':
         this.handCardMenuCardId.set(card.instanceId);
@@ -1562,17 +1565,64 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         break;
       case 'build':
         this.buildCardMenuCardId.set(card.instanceId);
-        this.setMenuPosition(event.clientX, event.clientY);
+        this.setBuildMenuPosition(event.clientX, event.clientY);
         break;
       case 'discard':
         this.discardCardMenuCardId.set(card.instanceId);
-        this.setMenuPosition(event.clientX, event.clientY);
+        this.setDiscardMenuPosition(event.clientX, event.clientY);
         break;
       case 'opponent':
         this.opponentCardMenuCard.set(card);
         this.setMenuPosition(event.clientX, event.clientY);
         break;
     }
+  }
+
+  private setBuildMenuPosition(x: number, y: number): void {
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const menuHeight = 300;
+    const menuWidth = 200;
+
+    let adjustedY = y;
+    if (y + menuHeight > viewportHeight) {
+      adjustedY = Math.max(10, viewportHeight - menuHeight - 10);
+    }
+
+    let adjustedX = x;
+    if (x + menuWidth > viewportWidth) {
+      adjustedX = Math.max(10, viewportWidth - menuWidth - 10);
+    }
+
+    this.buildCardMenuX.set(adjustedX);
+    this.buildCardMenuY.set(adjustedY);
+  }
+
+  private setDiscardMenuPosition(x: number, y: number): void {
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const menuHeight = 200;
+    const menuWidth = 200;
+
+    let adjustedY = y;
+    if (y + menuHeight > viewportHeight) {
+      adjustedY = Math.max(10, viewportHeight - menuHeight - 10);
+    }
+
+    let adjustedX = x;
+    if (x + menuWidth > viewportWidth) {
+      adjustedX = Math.max(10, viewportWidth - menuWidth - 10);
+    }
+
+    this.discardCardMenuX.set(adjustedX);
+    this.discardCardMenuY.set(adjustedY);
+  }
+
+  openStackMenuFromTouch(event: TouchDragEvent, card: CardInstanceDto): void {
+    this.stackMenuCardId.set(card.instanceId);
+    this.setMenuPosition(event.clientX, event.clientY, 400);
+    this.stackMenuX.set(this.cardMenuX());
+    this.stackMenuY.set(this.cardMenuY());
   }
 
   onTouchDragStart(event: TouchDragEvent, card: CardInstanceDto, zone: CardZone): void {

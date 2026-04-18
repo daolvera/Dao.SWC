@@ -217,6 +217,9 @@
                               [attr.data-owner]="card.ownerUserId"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -268,6 +271,9 @@
                               [attr.data-owner]="card.ownerUserId"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -304,6 +310,9 @@
                                 [class.retreated]="stackedCard.isRetreated"
                                 (dblclick)="zoomCard.set(stackedCard)"
                                 (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="onTouchLongPress($event, stackedCard, 'opponent')"
                               >
                                 <img
                                   [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
@@ -344,6 +353,9 @@
                               [attr.data-owner]="card.ownerUserId"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -395,6 +407,9 @@
                               [attr.data-owner]="card.ownerUserId"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -431,6 +446,9 @@
                                 [class.retreated]="stackedCard.isRetreated"
                                 (dblclick)="zoomCard.set(stackedCard)"
                                 (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="onTouchLongPress($event, stackedCard, 'opponent')"
                               >
                                 <img
                                   [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
@@ -471,6 +489,9 @@
                               [attr.data-owner]="card.ownerUserId"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -522,6 +543,9 @@
                               [attr.data-owner]="card.ownerUserId"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -558,6 +582,9 @@
                                 [class.retreated]="stackedCard.isRetreated"
                                 (dblclick)="zoomCard.set(stackedCard)"
                                 (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="onTouchLongPress($event, stackedCard, 'opponent')"
                               >
                                 <img
                                   [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
@@ -599,6 +626,9 @@
                               [class.tapped]="card.isTapped"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -645,6 +675,9 @@
                               [class.retreated]="card.isRetreated"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -678,6 +711,9 @@
                                 [class.retreated]="stackedCard.isRetreated"
                                 (dblclick)="zoomCard.set(stackedCard)"
                                 (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="onTouchLongPress($event, stackedCard, 'opponent')"
                               >
                                 <img
                                   [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
@@ -716,6 +752,9 @@
                               [class.tapped]="card.isTapped"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -762,6 +801,9 @@
                               [class.retreated]="card.isRetreated"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -795,6 +837,9 @@
                                 [class.retreated]="stackedCard.isRetreated"
                                 (dblclick)="zoomCard.set(stackedCard)"
                                 (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="onTouchLongPress($event, stackedCard, 'opponent')"
                               >
                                 <img
                                   [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
@@ -833,6 +878,9 @@
                               [class.tapped]="card.isTapped"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -879,6 +927,9 @@
                               [class.retreated]="card.isRetreated"
                               (dblclick)="zoomCard.set(card)"
                               (contextmenu)="openOpponentCardMenu($event, card)"
+                              appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, card, 'opponent')"
                             >
                               <img
                                 [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -912,6 +963,9 @@
                                 [class.retreated]="stackedCard.isRetreated"
                                 (dblclick)="zoomCard.set(stackedCard)"
                                 (contextmenu)="openOpponentCardMenu($event, stackedCard)"
+                                appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="onTouchLongPress($event, stackedCard, 'opponent')"
                               >
                                 <img
                                   [src]="stackedCard.cardImageUrl || 'assets/card-back.jpg'"
@@ -1042,7 +1096,7 @@
                             "
                             appTouchCard
                             [touchDraggable]="isCardOwner(card)"
-                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? (hasStack(card) ? 'stack' : 'card') : 'opponent')"
                             (touchDragStart)="onTouchDragStart($event, card, 'character')"
                             (touchDragEnd)="onTouchDrop($event, card, 'character')"
                           >
@@ -1211,7 +1265,7 @@
                             "
                             appTouchCard
                             [touchDraggable]="isCardOwner(card)"
-                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? (hasStack(card) ? 'stack' : 'card') : 'opponent')"
                             (touchDragStart)="onTouchDragStart($event, card, 'ground')"
                             (touchDragEnd)="onTouchDrop($event, card, 'ground')"
                           >
@@ -1383,7 +1437,7 @@
                             "
                             appTouchCard
                             [touchDraggable]="isCardOwner(card)"
-                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? 'card' : 'opponent')"
+                            (longPress)="onTouchLongPress($event, card, isCardOwner(card) ? (hasStack(card) ? 'stack' : 'card') : 'opponent')"
                             (touchDragStart)="onTouchDragStart($event, card, 'space')"
                             (touchDragEnd)="onTouchDrop($event, card, 'space')"
                           >

@@ -319,6 +319,21 @@ This ensures they work in both team mode and 1v1 mode.
 | `onDeckCardTouchDragMove(event)` | Handle touch drag move |
 | `onDeckCardTouchDrop(event, card)` | Handle touch drop to reorder deck |
 
+### Touch Event Handlers (iPad/Mobile)
+
+| Method | Description |
+|--------|-------------|
+| `onTouchLongPress(event, card, menuType)` | Handle long-press to open context menu. Menu types: `'card'` (arena card), `'stack'` (stacked card), `'hand'`, `'build'`, `'discard'`, `'opponent'` |
+| `openStackMenuFromTouch(event, card)` | Open stack menu from touch event |
+| `onTouchDragStart(event, card, zone)` | Start touch drag operation |
+| `onTouchDrop(event, card, sourceZone)` | Handle touch drop — move card or reorder within arena |
+
+**Touch Behavior:**
+- **Long-press (500ms)** on own card: Opens card menu (or stack menu if card has stacked cards)
+- **Long-press** on opponent card: Opens opponent menu (Zoom only)
+- **Drag** on own card: Moves card between zones
+- Uses `appTouchCard` directive for touch event handling
+
 ### Tap & Game Actions
 
 | Method | Description |
