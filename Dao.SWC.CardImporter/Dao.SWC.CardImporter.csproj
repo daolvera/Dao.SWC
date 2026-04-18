@@ -15,7 +15,7 @@
     <PackageReference Include="Aspire.Azure.Security.KeyVault" Version="13.2.2" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.2.2" />
     <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.2.2" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.6" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\TCG\Cards\**\*.*">

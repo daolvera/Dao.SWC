@@ -61,6 +61,15 @@
                       {{ player.alignment === Alignment.Light ? 'Light Side' : 'Dark Side' }}
                     </span>
                   </div>
+                  @if (room()!.isRestarting) {
+                    <div class="mt-1">
+                      @if (player.hasConfirmedRestartDeck) {
+                        <span class="badge bg-success">Ready</span>
+                      } @else {
+                        <span class="badge bg-secondary">Selecting deck...</span>
+                      }
+                    </div>
+                  }
                   @if (isHost() && !player.isHost) {
                     <button
                       class="btn btn-outline-danger btn-sm mt-2"
@@ -79,17 +88,19 @@
             </div>
             @if (canStart()) {
               <p class="mt-3 text-success">Ready to start!</p>
+            } @else if (room()!.isRestarting) {
+              <p class="mt-3 text-muted">Waiting for all players to confirm deck selection</p>
             } @else {
               <p class="mt-3 text-muted">Need at least 2 players to start</p>
             }
-            @if (room()!.players.length > 1 && isRestartWaiting()) {
+            @if (room()!.isRestarting && !myPlayer()?.hasConfirmedRestartDeck) {
               <div class="card mt-3">
                 <div class="card-header"><h6 class="mb-0">Select Your Deck</h6></div>
                 <div class="card-body">
-                  <select class="form-select mb-2" (change)="restartDeckIdSelect.set(+$any($event.target).value || null)">
+                  <select class="form-select mb-2" [value]="restartDeckIdSelect()" (change)="restartDeckIdSelect.set(+$any($event.target).value || null)">
                     <option value="">Choose a deck...</option>
                     @for (deck of restartValidDecks(); track deck.id) {
-                      <option [value]="deck.id">{{ deck.name }}</option>
+                      <option [value]="deck.id" [selected]="deck.id === restartDeckIdSelect()">{{ deck.name }}</option>
                     }
                   </select>
                   @if (restartDeckIsNeutral()) {
@@ -106,6 +117,10 @@
                     Confirm Deck
                   </button>
                 </div>
+              </div>
+            } @else if (room()!.isRestarting && myPlayer()?.hasConfirmedRestartDeck) {
+              <div class="alert alert-success mt-3">
+                <strong>Deck confirmed!</strong> Waiting for other players...
               </div>
             }
           </div>
@@ -1488,6 +1503,19 @@
                   }
                 </div>
               }
+
+              <!-- Show Hand to Opponents Toggle -->
+              <div class="show-hand-toggle">
+                <label class="form-check-label">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    [checked]="myShowHandToOpponents()"
+                    (change)="toggleShowHandToOpponents()"
+                  />
+                  Show hand to opponents
+                </label>
+              </div>
               
               <!-- Build Zone -->
               <div
@@ -1508,6 +1536,21 @@
                 </div>
               </div>
             </div>
+
+            <!-- Opponent Hand Buttons (When opponent shares hand) - Always visible -->
+            @if (opponentsWhoShareHand().length > 0) {
+              <div class="opponent-hand-controls-bar">
+                @for (opponent of opponentsWhoShareHand(); track opponent.username) {
+                  <button
+                    class="btn btn-sm btn-outline-warning opponent-hand-btn"
+                    (click)="openOpponentHandModal(opponent.username)"
+                    title="View opponent hand"
+                  >
+                    👁 {{ opponent.username }}'s Hand ({{ opponent.hand.length }})
+                  </button>
+                }
+              </div>
+            }
             
             <!-- Hand, Deck, Discard Row -->
             <div class="hand-row">
@@ -1711,13 +1754,27 @@
                 </div>
               </div>
               <div class="modal-cards scrollable">
-                @for (card of deckBrowserFiltered(); track card.instanceId) {
+                @for (card of deckBrowserFiltered(); track card.instanceId; let i = $index) {
                   <div
                     class="game-card clickable"
                     [class.sideways]="card.cardType !== 0"
+                    [class.deck-drag-over]="deckBrowserDragOverIndex() === i && deckBrowserDraggedCard()?.instanceId !== card.instanceId"
+                    [class.deck-dragging]="deckBrowserDraggedCard()?.instanceId === card.instanceId"
+                    [attr.data-deck-index]="i"
+                    draggable="true"
+                    (dragstart)="onDeckCardDragStart($event, card)"
+                    (dragover)="onDeckCardDragOver($event, i)"
+                    (dragleave)="onDeckCardDragLeave()"
+                    (dragend)="onDeckCardDragEnd()"
+                    (drop)="onDeckCardDrop($event, card)"
                     (click)="takeCardFromDeck(card.instanceId)"
                     (contextmenu)="openDeckCardMenu($event, card)"
-                    [title]="'Click to take ' + card.cardName + ' to hand'"
+                    [title]="'Click to take ' + card.cardName + ' to hand, drag to reorder'"
+                    appTouchCard
+                    [touchDraggable]="true"
+                    (touchDragStart)="onDeckCardTouchDragStart($event, card)"
+                    (touchDragMove)="onDeckCardTouchDragMove($event)"
+                    (touchDragEnd)="onDeckCardTouchDrop($event, card)"
                   >
                     <img
                       [src]="card.cardImageUrl || 'assets/card-back.jpg'"
@@ -2188,6 +2245,38 @@
                 }
               </div>
               <button class="btn btn-secondary mt-3" (click)="closeTeammateHandModal()">Close</button>
+            </div>
+          </div>
+        }
+
+        <!-- Opponent Hand Modal -->
+        @if (showOpponentHandModal()) {
+          <div class="modal-overlay" (click)="closeOpponentHandModal()">
+            <div class="modal-content opponent-hand-modal" (click)="$event.stopPropagation()">
+              @if (opponentHandPlayer() && opponentHandPlayer()!.showHandToOpponents) {
+                <h4>{{ opponentHandPlayer()!.username }}'s Hand ({{ opponentHandPlayer()!.hand.length }} cards)</h4>
+                <div class="modal-cards opponent-hand-cards">
+                  @for (card of opponentHandPlayer()!.hand; track card.instanceId) {
+                    <div
+                      class="game-card"
+                      [class.sideways]="card.cardType !== 0"
+                      (dblclick)="zoomCard.set(card)"
+                    >
+                      <img
+                        [src]="card.cardImageUrl || 'assets/card-back.jpg'"
+                        [alt]="card.cardName"
+                      />
+                      <div class="card-name-overlay">{{ card.cardName }}</div>
+                    </div>
+                  } @empty {
+                    <p class="text-muted">No cards in hand</p>
+                  }
+                </div>
+              } @else {
+                <h4>Hand Viewing Disabled</h4>
+                <p class="text-muted">{{ showOpponentHandModal() }} has disabled hand viewing.</p>
+              }
+              <button class="btn btn-secondary mt-3" (click)="closeOpponentHandModal()">Close</button>
             </div>
           </div>
         }

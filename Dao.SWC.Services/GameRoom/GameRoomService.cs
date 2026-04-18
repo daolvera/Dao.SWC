@@ -290,6 +290,19 @@ public class GameRoomService : IGameRoomService
             return false;
         }
 
+        // If restarting, all players must have confirmed their deck selection
+        if (room.IsRestarting && !room.Players.All(p => p.HasConfirmedRestartDeck))
+        {
+            return false;
+        }
+
+        // Clear restart state
+        room.IsRestarting = false;
+        foreach (var player in room.Players)
+        {
+            player.HasConfirmedRestartDeck = false;
+        }
+
         // Initialize team data for team modes
         if (room.IsTeamMode)
         {
@@ -914,6 +927,48 @@ public class GameRoomService : IGameRoomService
         card.ZonePosition = null;
 
         return Task.FromResult<CardInstance?>(card);
+    }
+
+    public Task<bool> ReorderDeckAsync(string roomCode, string userId, IEnumerable<Guid> cardInstanceIds)
+    {
+        if (!_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            return Task.FromResult(false);
+        }
+
+        var player = room.GetPlayer(userId);
+        if (player == null)
+        {
+            return Task.FromResult(false);
+        }
+
+        var newOrderList = cardInstanceIds.ToList();
+        var deckCards = player.Cards.Where(c => c.Zone == CardZone.Deck).ToList();
+
+        // Validate that all provided IDs are in the deck
+        var deckCardIds = deckCards.Select(c => c.InstanceId).ToHashSet();
+        if (!newOrderList.All(id => deckCardIds.Contains(id)))
+        {
+            return Task.FromResult(false);
+        }
+
+        // If partial reorder (e.g., top X cards), append remaining deck cards in their current order
+        var reorderedIds = new HashSet<Guid>(newOrderList);
+        var remainingCards = deckCards.Where(c => !reorderedIds.Contains(c.InstanceId)).ToList();
+
+        // Build the new card order: reordered cards first, then remaining cards
+        var newDeckOrder = newOrderList
+            .Select(id => deckCards.First(c => c.InstanceId == id))
+            .Concat(remainingCards)
+            .ToList();
+
+        // Remove all deck cards from the player's Cards list
+        player.Cards.RemoveAll(c => c.Zone == CardZone.Deck);
+
+        // Add them back in the new order
+        player.Cards.AddRange(newDeckOrder);
+
+        return Task.FromResult(true);
     }
 
     public Task<bool> UpdateForceAsync(string roomCode, string userId, int force)
@@ -1592,6 +1647,7 @@ public class GameRoomService : IGameRoomService
             return Task.FromResult<Core.GameRoom.GameRoom?>(null);
 
         room.State = GameState.Waiting;
+        room.IsRestarting = true;
         room.CurrentTurnUserId = null;
         room.TurnOrder.Clear();
         room.TurnNumber = 0;
@@ -1605,12 +1661,12 @@ public class GameRoomService : IGameRoomService
             player.Cards.Clear();
             player.Force = 4;
             player.BuildCounter = room.RoomType == RoomType.OneVsOne ? 30 : 60;
-            player.DeckId = 0;
-            player.DeckName = string.Empty;
+            // Preserve DeckId, DeckName, and DeckAlignment so players can keep their previous deck
             player.SpaceArenaRetreated = false;
             player.GroundArenaRetreated = false;
             player.CharacterArenaRetreated = false;
             player.SecretBid = null;
+            player.HasConfirmedRestartDeck = false;
         }
 
         return Task.FromResult<Core.GameRoom.GameRoom?>(room);
@@ -1638,8 +1694,10 @@ public class GameRoomService : IGameRoomService
             return null;
 
         player.DeckId = deckId;
+        player.DeckName = deck.Name;
         player.DeckAlignment = deck.Alignment;
         player.PlayAsAlignment = playAsAlignment;
+        player.HasConfirmedRestartDeck = true;
 
         return room;
     }

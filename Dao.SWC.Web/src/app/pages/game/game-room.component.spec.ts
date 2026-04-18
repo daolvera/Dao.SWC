@@ -54,6 +54,7 @@ function makePlayer(overrides: Partial<GamePlayerDto> = {}): GamePlayerDto {
   return {
     username: 'player1',
     deckName: 'Test Deck',
+    deckId: 1,
     alignment: Alignment.Light,
     team: Team.Team1,
     isHost: false,
@@ -70,6 +71,8 @@ function makePlayer(overrides: Partial<GamePlayerDto> = {}): GamePlayerDto {
     groundArenaRetreated: false,
     characterArenaRetreated: false,
     secretBid: null,
+    hasConfirmedRestartDeck: false,
+    showHandToOpponents: false,
     ...overrides,
   };
 }
@@ -97,6 +100,7 @@ function makeRoom(overrides: Partial<GameRoomDto> = {}): GameRoomDto {
     players: [],
     teams: null,
     bidsRevealed: false,
+    isRestarting: false,
     ...overrides,
   };
 }
@@ -1047,6 +1051,94 @@ describe('GameRoomComponent', () => {
     it('getPlayerCardCount returns hand + deck', () => {
       const player = makePlayer({ hand: [makeCard(), makeCard()], deckSize: 28 });
       expect(component.getPlayerCardCount(player)).toBe(30);
+    });
+  });
+
+  // ---------- Opponent Hand Sharing ----------
+
+  describe('Opponent Hand Sharing', () => {
+    it('myShowHandToOpponents returns false by default', () => {
+      setRoom(
+        makeRoom({
+          players: [makePlayer({ username: 'player1', showHandToOpponents: false })],
+        }),
+      );
+      expect(component.myShowHandToOpponents()).toBe(false);
+    });
+
+    it('myShowHandToOpponents returns true when enabled', () => {
+      setRoom(
+        makeRoom({
+          players: [makePlayer({ username: 'player1', showHandToOpponents: true })],
+        }),
+      );
+      expect(component.myShowHandToOpponents()).toBe(true);
+    });
+
+    it('opponentsWhoShareHand returns only opponents with sharing enabled', () => {
+      setRoom(
+        makeRoom({
+          players: [
+            makePlayer({ username: 'player1' }),
+            makePlayer({ username: 'opponent1', showHandToOpponents: true }),
+            makePlayer({ username: 'opponent2', showHandToOpponents: false }),
+            makePlayer({ username: 'opponent3', showHandToOpponents: true }),
+          ],
+        }),
+      );
+      const sharing = component.opponentsWhoShareHand();
+      expect(sharing).toHaveLength(2);
+      expect(sharing.map((p) => p.username)).toEqual(['opponent1', 'opponent3']);
+    });
+
+    it('opponentsWhoShareHand returns empty when no opponents share', () => {
+      setRoom(
+        makeRoom({
+          players: [
+            makePlayer({ username: 'player1' }),
+            makePlayer({ username: 'opponent1', showHandToOpponents: false }),
+          ],
+        }),
+      );
+      expect(component.opponentsWhoShareHand()).toHaveLength(0);
+    });
+
+    it('opponentHandPlayer returns the opponent matching modal username', () => {
+      const opponent = makePlayer({ username: 'opponent1', showHandToOpponents: true });
+      setRoom(
+        makeRoom({
+          players: [makePlayer({ username: 'player1' }), opponent],
+        }),
+      );
+      component.openOpponentHandModal('opponent1');
+      expect(component.opponentHandPlayer()?.username).toBe('opponent1');
+    });
+
+    it('opponentHandPlayer returns null when modal not open', () => {
+      setRoom(
+        makeRoom({
+          players: [
+            makePlayer({ username: 'player1' }),
+            makePlayer({ username: 'opponent1' }),
+          ],
+        }),
+      );
+      expect(component.opponentHandPlayer()).toBeNull();
+    });
+
+    it('closeOpponentHandModal clears the modal state', () => {
+      setRoom(
+        makeRoom({
+          players: [
+            makePlayer({ username: 'player1' }),
+            makePlayer({ username: 'opponent1', showHandToOpponents: true }),
+          ],
+        }),
+      );
+      component.openOpponentHandModal('opponent1');
+      expect(component.showOpponentHandModal()).toBe('opponent1');
+      component.closeOpponentHandModal();
+      expect(component.showOpponentHandModal()).toBeNull();
     });
   });
 });

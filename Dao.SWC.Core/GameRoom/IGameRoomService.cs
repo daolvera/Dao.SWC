@@ -199,6 +199,15 @@ public interface IGameRoomService
     Task<CardInstance?> TakeFromDeckAsync(string roomCode, string userId, Guid cardInstanceId);
 
     /// <summary>
+    /// Reorder the player's deck based on the provided card instance IDs.
+    /// </summary>
+    /// <param name="roomCode">The room code</param>
+    /// <param name="userId">The player's user ID</param>
+    /// <param name="cardInstanceIds">The card instance IDs in the new order (first = top of deck)</param>
+    /// <returns>True if successful, false otherwise</returns>
+    Task<bool> ReorderDeckAsync(string roomCode, string userId, IEnumerable<Guid> cardInstanceIds);
+
+    /// <summary>
     /// Update a player's Force counter.
     /// </summary>
     Task<bool> UpdateForceAsync(string roomCode, string userId, int force);
