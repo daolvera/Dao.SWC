@@ -82,27 +82,8 @@ var webApp = builder
     .WithReference(apiService)
     .WaitFor(apiService);
 
-// In production, the API serves the built frontend from wwwroot (Model 1)
+// In production, the API serves the built frontend from wwwroot
 apiService.PublishWithContainerFiles(webApp, "wwwroot");
-
-//if (builder.ExecutionContext.IsPublishMode)
-//{
-//    var apiCustomDomain = builder.AddParameter(Constants.CustomDomainParameters.ApiCustomDomain);
-//    var apiCertificateName = builder.AddParameter(Constants.CustomDomainParameters.ApiCertificateName);
-//    var appCustomDomain = builder.AddParameter(Constants.CustomDomainParameters.AppCustomDomain);
-//    var appCertificateName = builder.AddParameter(Constants.CustomDomainParameters.AppCertificateName);
-
-//    builder.AddAzureContainerAppEnvironment("cae-hmvnzqjqex33y");
-//    apiService.PublishAsAzureContainerApp((module, app) =>
-//    {
-//        app.ConfigureCustomDomain(apiCustomDomain, apiCertificateName);
-//    });
-
-//    webApp.PublishAsAzureContainerApp((module, app) =>
-//    {
-//        app.ConfigureCustomDomain(appCustomDomain, appCertificateName);
-//    });
-//}
 
 if (!builder.ExecutionContext.IsPublishMode)
 {
