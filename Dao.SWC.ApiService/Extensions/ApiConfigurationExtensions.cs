@@ -43,29 +43,6 @@ public static class ApiConfigurationExtensions
             });
             return services;
         }
-
-        public IServiceCollection AddSpaCors(string appUrl)
-        {
-            services.AddCors(options =>
-            {
-                options.AddDefaultPolicy(policy =>
-                {
-                    // Allow both http and https versions (Azure Container Apps uses https publicly)
-                    var origins = new List<string> { appUrl };
-                    if (appUrl.StartsWith("http://"))
-                    {
-                        origins.Add(appUrl.Replace("http://", "https://"));
-                    }
-
-                    policy
-                        .WithOrigins([.. origins])
-                        .AllowAnyMethod()
-                        .AllowAnyHeader()
-                        .AllowCredentials();
-                });
-            });
-            return services;
-        }
     }
 
     extension(HttpContext httpContext)

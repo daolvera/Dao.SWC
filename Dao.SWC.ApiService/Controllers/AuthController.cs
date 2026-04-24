@@ -1,4 +1,4 @@
-﻿using Dao.SWC.ApiService.Extensions;
+using Dao.SWC.ApiService.Extensions;
 using Dao.SWC.Core;
 using Dao.SWC.Core.Authentication;
 using Dao.SWC.Core.Entities;
@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.IdentityModel.Protocols.Configuration;
 using System.Security.Claims;
 
 namespace Dao.SWC.ApiService.Controllers;
@@ -47,12 +46,10 @@ public class AuthController(
     [HttpDelete("logout")]
     public IActionResult Logout()
     {
-        var cookieDomain = GetSharedCookieDomain();
         var deleteOptions = new CookieOptions
         {
-            Domain = cookieDomain,
             Secure = true,
-            SameSite = SameSiteMode.Lax,
+            SameSite = SameSiteMode.Strict,//SameSiteMode.Lax,
         };
 
         Response.Cookies.Delete(Constants.Authentication.AccessTokenCookieKey, deleteOptions);
@@ -115,10 +112,7 @@ public class AuthController(
         var name = result.Principal.FindFirstValue(ClaimTypes.Name);
 
         string applicationBaseUrl =
-            Configuration[Constants.AppUrlConfigurationKey]
-            ?? throw new InvalidConfigurationException(
-                $"{Constants.AppUrlConfigurationKey} is not configured"
-            );
+            Configuration[Constants.AppUrlConfigurationKey] ?? string.Empty;
         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
         {
             return Redirect($"{applicationBaseUrl}/auth/error?message=missing_claims");
@@ -190,35 +184,28 @@ public class AuthController(
 
     private void SetSecureTokenCookies(TokenResponse tokens)
     {
-        // Get shared domain for cross-subdomain cookies (e.g., .politedune-xxx.westus.azurecontainerapps.io)
-        var cookieDomain = GetSharedCookieDomain();
-
         var cookieOptions = new CookieOptions
         {
-            HttpOnly = true, // Prevents JavaScript access
-            Secure = true, // HTTPS only
-            SameSite = SameSiteMode.Lax, // Allows redirects from OAuth provider
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,//SameSiteMode.Lax,
             Expires = tokens.ExpiresAt,
-            Domain = cookieDomain,
         };
 
         var refreshCookieOptions = new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
-            SameSite = SameSiteMode.Lax, // Allows redirects from OAuth provider
-            Expires = DateTime.UtcNow.AddDays(7), // Refresh token expires in 7 days
-            Domain = cookieDomain,
+            SameSite = SameSiteMode.Strict,//SameSiteMode.Lax,
+            Expires = DateTime.UtcNow.AddDays(7),
         };
 
-        // Set access token cookie
         Response.Cookies.Append(
             Constants.Authentication.AccessTokenCookieKey,
             tokens.AccessToken,
             cookieOptions
         );
 
-        // Set refresh token cookie
         Response.Cookies.Append(
             Constants.Authentication.RefreshTokenCookieKey,
             tokens.RefreshToken,
@@ -231,27 +218,9 @@ public class AuthController(
             new CookieOptions
             {
                 Secure = true,
-                SameSite = SameSiteMode.Lax, // Allows redirects from OAuth provider
+                SameSite = SameSiteMode.Strict,//SameSiteMode.Lax,
                 Expires = tokens.ExpiresAt,
-                Domain = cookieDomain,
             }
         );
-    }
-
-    private string? GetSharedCookieDomain()
-    {
-        var host = Request.Host.Host;
-        // For localhost, don't set domain (cookies work on same origin)
-        if (host == "localhost" || host == "127.0.0.1")
-            return null;
-
-        // Extract parent domain: breakpointapi.politedune-xxx.westus.azurecontainerapps.io
-        // becomes .politedune-xxx.westus.azurecontainerapps.io
-        var parts = host.Split('.');
-        if (parts.Length > 1)
-        {
-            return "." + string.Join(".", parts.Skip(1));
-        }
-        return null;
     }
 }

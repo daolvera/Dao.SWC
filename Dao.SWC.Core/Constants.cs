@@ -4,7 +4,6 @@ public static class Constants
 {
     public const string AnonymousPolicy = "AnonymousRateLimitingPolicy";
     public const string AppUrlConfigurationKey = "SwcAppUrl";
-    public const string ApiUrlConfigurationKey = "SwcApiUrl";
 
     public static class WebAppConfiguration
     {

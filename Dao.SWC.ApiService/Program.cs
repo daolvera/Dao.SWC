@@ -50,13 +50,6 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 builder.Services.AddLoginInRateLimiter();
 
-builder.Services.AddSpaCors(
-    builder.Configuration[Constants.AppUrlConfigurationKey]
-        ?? throw new InvalidOperationException(
-            $"{Constants.AppUrlConfigurationKey} is not configured"
-        )
-);
-
 builder.Services.AddControllers();
 builder.Services.AddRouting(options =>
 {
@@ -123,8 +116,6 @@ app.UseRateLimiter();
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
-app.UseCors();
-
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -150,5 +141,9 @@ app.MapControllers();
 app.MapHub<GameHub>(Constants.WebAppConfiguration.GameHubPath);
 
 app.MapDefaultEndpoints();
+
+// Serve the Angular frontend from wwwroot (populated by Aspire's PublishWithContainerFiles at publish time)
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 
 app.Run();

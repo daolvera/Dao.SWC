@@ -60,7 +60,7 @@ var cardTextScraper = builder
 
 var apiService = builder
     .AddProject<Projects.Dao_SWC_ApiService>(Constants.ProjectNames.ApiService)
-    .WithExternalHttpEndpoints() // Required for OAuth callbacks
+    .WithExternalHttpEndpoints()
     .WaitForCompletion(migrations)
     .WithReference(swcDb)
     .WithReference(blobs)
@@ -80,11 +80,10 @@ if (builder.ExecutionContext.IsPublishMode)
 var webApp = builder
     .AddJavaScriptApp(Constants.ProjectNames.WebApp, Constants.WebAppConfiguration.AppFolder)
     .WithReference(apiService)
-    .WaitFor(apiService)
-    .WithHttpEndpoint(targetPort: 3000, env: "PORT")
-    .WithExternalHttpEndpoints()
-    .PublishAsDockerFile()
-    .WithHttpHealthCheck("/health");
+    .WaitFor(apiService);
+
+// In production, the API serves the built frontend from wwwroot (Model 1)
+apiService.PublishWithContainerFiles(webApp, "wwwroot");
 
 //if (builder.ExecutionContext.IsPublishMode)
 //{
@@ -105,28 +104,12 @@ var webApp = builder
 //    });
 //}
 
-if (builder.ExecutionContext.IsPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration[Constants.AppUrlConfigurationKey]))
+if (!builder.ExecutionContext.IsPublishMode)
 {
-    apiService.WithEnvironment(
-        Constants.AppUrlConfigurationKey,
-        builder.Configuration[Constants.AppUrlConfigurationKey]
-    );
-}
-else
-{
+    // In dev mode, set SwcAppUrl to the Angular dev server so auth redirects go there
+    webApp.WithHttpEndpoint(targetPort: 3000, env: "PORT");
     var frontendHttpEndpoint = webApp.GetEndpoint("http");
     apiService.WithEnvironment(Constants.AppUrlConfigurationKey, frontendHttpEndpoint);
-}
-
-if (builder.ExecutionContext.IsPublishMode && !string.IsNullOrWhiteSpace(builder.Configuration[Constants.ApiUrlConfigurationKey]))
-{
-    webApp.WithEnvironment(
-        Constants.WebAppConfiguration.ApiUrlEnvironmentKey,
-        builder.Configuration[Constants.ApiUrlConfigurationKey]
-    );
-}
-else
-{
     webApp.WithEnvironment(
         Constants.WebAppConfiguration.ApiUrlEnvironmentKey,
         apiService.GetEndpoint("https")

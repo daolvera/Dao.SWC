@@ -364,3 +364,4 @@ FodyWeavers.xsd
 .azure
 /Dao.SWC.Web/.playwright-mcp
 /Decks
+**/package-lock.json
