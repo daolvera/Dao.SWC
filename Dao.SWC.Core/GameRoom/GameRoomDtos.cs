@@ -22,7 +22,8 @@ public record GameRoomDto(
     GameState State,
     IEnumerable<GamePlayerDto> Players,
     IEnumerable<TeamDataDto>? Teams,
-    bool BidsRevealed
+    bool BidsRevealed,
+    bool IsRestarting
 );
 
 public record TeamDataDto(
@@ -40,6 +41,7 @@ public record TeamDataDto(
 public record GamePlayerDto(
     string Username,
     string DeckName,
+    int DeckId,
     Enums.Alignment Alignment,
     Team Team,
     bool IsHost,
@@ -55,7 +57,9 @@ public record GamePlayerDto(
     bool SpaceArenaRetreated,
     bool GroundArenaRetreated,
     bool CharacterArenaRetreated,
-    int? SecretBid
+    int? SecretBid,
+    bool HasConfirmedRestartDeck,
+    bool ShowHandToOpponents
 );
 
 public record CardInstanceDto(

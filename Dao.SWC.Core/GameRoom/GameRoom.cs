@@ -50,6 +50,11 @@ public class GameRoom
     /// </summary>
     public bool BidsRevealed { get; set; }
 
+    /// <summary>
+    /// Whether the room is in a restart state (waiting for all players to confirm deck selection).
+    /// </summary>
+    public bool IsRestarting { get; set; }
+
     public int MaxPlayers =>
         RoomType switch
         {

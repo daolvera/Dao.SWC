@@ -274,6 +274,11 @@ export class GameHubService {
     await this.hubConnection.invoke('TakeFromDeck', cardInstanceId);
   }
 
+  async reorderDeck(cardInstanceIds: string[]): Promise<boolean> {
+    if (!this.hubConnection || !this._currentRoomCode) return false;
+    return await this.hubConnection.invoke<boolean>('ReorderDeck', cardInstanceIds);
+  }
+
   async updateForce(force: number): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('UpdateForce', force);
@@ -432,6 +437,13 @@ export class GameHubService {
   async clearBid(): Promise<void> {
     if (!this.hubConnection || !this._currentRoomCode) return;
     await this.hubConnection.invoke('ClearBid');
+  }
+
+  // Hand visibility
+
+  async toggleShowHandToOpponents(): Promise<void> {
+    if (!this.hubConnection || !this._currentRoomCode) return;
+    await this.hubConnection.invoke('ToggleShowHandToOpponents');
   }
 
   // Piloting

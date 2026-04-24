@@ -57,6 +57,16 @@ public class GamePlayer
     public Alignment? PlayAsAlignment { get; set; }
 
     /// <summary>
+    /// Whether the player has confirmed their deck selection during a game restart.
+    /// </summary>
+    public bool HasConfirmedRestartDeck { get; set; }
+
+    /// <summary>
+    /// Whether the player allows opponents to view their hand.
+    /// </summary>
+    public bool ShowHandToOpponents { get; set; }
+
+    /// <summary>
     /// Gets the effective alignment for gameplay purposes.
     /// For neutral decks, returns the PlayAsAlignment; otherwise returns DeckAlignment.
     /// </summary>

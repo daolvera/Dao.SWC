@@ -24,6 +24,7 @@ export interface GameRoomDto {
   players: GamePlayerDto[];
   teams: TeamDataDto[] | null;
   bidsRevealed: boolean;
+  isRestarting: boolean;
 }
 
 export interface TeamDataDto {
@@ -41,6 +42,7 @@ export interface TeamDataDto {
 export interface GamePlayerDto {
   username: string;
   deckName: string;
+  deckId: number;
   alignment: Alignment;
   team: Team;
   isHost: boolean;
@@ -57,6 +59,8 @@ export interface GamePlayerDto {
   groundArenaRetreated: boolean;
   characterArenaRetreated: boolean;
   secretBid: number | null;
+  hasConfirmedRestartDeck: boolean;
+  showHandToOpponents: boolean;
 }
 
 export interface CardInstanceDto {

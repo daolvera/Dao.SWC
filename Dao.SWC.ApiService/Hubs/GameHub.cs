@@ -488,6 +488,28 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     }
 
     /// <summary>
+    /// Reorder the player's deck based on the provided card instance IDs.
+    /// </summary>
+    public async Task<bool> ReorderDeck(IEnumerable<string> cardInstanceIds)
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return false;
+
+        var guids = new List<Guid>();
+        foreach (var id in cardInstanceIds)
+        {
+            if (!Guid.TryParse(id, out var guid))
+                return false;
+            guids.Add(guid);
+        }
+
+        var success = await gameRoomService.ReorderDeckAsync(roomCode, userId, guids);
+        return success;
+    }
+
+    /// <summary>
     /// Update the player's Force counter.
     /// </summary>
     public async Task UpdateForce(int force)
@@ -736,6 +758,28 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
     }
 
     /// <summary>
+    /// Toggle whether the current player's hand is visible to opponents.
+    /// </summary>
+    public async Task ToggleShowHandToOpponents()
+    {
+        var userId = Context.User?.GetAppUserId();
+        var roomCode = GetCurrentRoomCode();
+        if (userId == null || roomCode == null)
+            return;
+
+        var room = gameRoomService.GetRoom(roomCode);
+        if (room == null)
+            return;
+
+        var player = room.Players.FirstOrDefault(p => p.UserId == userId);
+        if (player == null)
+            return;
+
+        player.ShowHandToOpponents = !player.ShowHandToOpponents;
+        await SendRoomUpdateToGroupAsync(room);
+    }
+
+    /// <summary>
     /// Move a card from build zone to play area.
     /// </summary>
     public async Task<PlayCardResultDto> MoveFromBuild(string cardInstanceId, string arena)
@@ -822,7 +866,8 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             room.State,
             room.Players.Select(p => MapToPlayerDto(p, p.UserId == viewingUserId, room.HostUserId, room, viewingPlayer)),
             room.IsTeamMode ? room.Teams.Values.Select(t => MapToTeamDto(t, room, viewingPlayer)) : null,
-            room.BidsRevealed
+            room.BidsRevealed,
+            room.IsRestarting
         );
     }
 
@@ -875,12 +920,14 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
         }
 
         // In team mode, teammates can see each other's hands
+        // Also allow if player has opted to show hand to opponents
         var isTeammate = isTeamMode && viewingPlayer != null && player.Team == viewingPlayer.Team;
-        var canSeeHand = isMe || isTeammate;
+        var canSeeHand = isMe || isTeammate || player.ShowHandToOpponents;
 
         return new GamePlayerDto(
             player.DisplayName,
             player.DeckName,
+            player.DeckId,
             player.EffectiveAlignment,
             player.Team,
             player.UserId == hostUserId,
@@ -902,7 +949,9 @@ public class GameHub(IGameRoomService gameRoomService, ILogger<GameHub> logger) 
             isTeamMode && teamData != null ? teamData.SpaceArenaRetreated : player.SpaceArenaRetreated,
             isTeamMode && teamData != null ? teamData.GroundArenaRetreated : player.GroundArenaRetreated,
             isTeamMode && teamData != null ? teamData.CharacterArenaRetreated : player.CharacterArenaRetreated,
-            bidToShow
+            bidToShow,
+            player.HasConfirmedRestartDeck,
+            player.ShowHandToOpponents
         );
     }
 

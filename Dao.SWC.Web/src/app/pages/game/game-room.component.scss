@@ -686,6 +686,61 @@
         }
       }
 
+      .opponent-hand-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-left: 1rem;
+        padding-left: 1rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.2);
+
+        .opponent-hand-btn {
+          font-size: 0.75rem;
+          padding: 0.25rem 0.5rem;
+          white-space: nowrap;
+        }
+      }
+
+      .show-hand-toggle {
+        display: flex;
+        align-items: center;
+        margin-left: 1rem;
+        padding-left: 1rem;
+        border-left: 1px solid rgba(255, 255, 255, 0.2);
+
+        label {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          font-size: 0.75rem;
+          color: rgba(255, 255, 255, 0.8);
+          cursor: pointer;
+          margin: 0;
+          white-space: nowrap;
+        }
+
+        .form-check-input {
+          margin: 0;
+          cursor: pointer;
+        }
+      }
+
+      .opponent-hand-controls-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(255, 193, 7, 0.1);
+        border-bottom: 1px solid rgba(255, 193, 7, 0.3);
+
+        .opponent-hand-btn {
+          font-size: 0.75rem;
+          padding: 0.25rem 0.5rem;
+          white-space: nowrap;
+        }
+      }
+
       .hand-row {
         display: flex;
         align-items: center;
@@ -1416,6 +1471,45 @@
         overflow-y: auto;
       }
 
+      /* Deck browser drag-and-drop styles */
+      .modal-cards .game-card.deck-dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+      }
+
+      .modal-cards .game-card.deck-drag-over {
+        outline: 3px solid var(--bs-primary);
+        outline-offset: 4px;
+        background-color: rgba(var(--bs-primary-rgb), 0.15);
+        transform: scale(1.05);
+        z-index: 1;
+      }
+
+      .modal-cards .game-card[draggable="true"] {
+        cursor: grab;
+        touch-action: none;
+        transition: transform 0.15s ease, outline 0.15s ease;
+      }
+
+      .modal-cards .game-card[draggable="true"]:active {
+        cursor: grabbing;
+      }
+
+      /* Larger cards and spacing for deck browser to make drag-drop easier */
+      .modal-content.large .modal-cards {
+        gap: 1rem;
+      }
+
+      .modal-content.large .modal-cards .game-card {
+        width: 120px;
+        height: 168px;
+        padding: 4px;
+      }
+
+      .modal-content.large .modal-cards .game-card.sideways {
+        margin: calc((168px - 120px) / 2) calc((120px - 168px) / 2);
+      }
+
       /* Teammate Hand Modal */
       .teammate-hand-modal {
         max-width: 90vw;
@@ -1434,6 +1528,28 @@
       }
 
       .teammate-hand-cards .game-card:hover {
+        transform: scale(1.05);
+        z-index: 10;
+      }
+
+      /* Opponent Hand Modal */
+      .opponent-hand-modal {
+        max-width: 90vw;
+        width: auto;
+        min-width: 300px;
+      }
+
+      .opponent-hand-cards {
+        max-height: 60vh;
+        overflow-y: auto;
+        justify-content: center;
+      }
+
+      .opponent-hand-cards .game-card {
+        cursor: pointer;
+      }
+
+      .opponent-hand-cards .game-card:hover {
         transform: scale(1.05);
         z-index: 10;
       }

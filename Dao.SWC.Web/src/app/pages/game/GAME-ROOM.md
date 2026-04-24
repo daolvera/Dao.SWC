@@ -74,11 +74,15 @@ The `room` signal is the single source of truth. Setting it triggers a cascade t
 | `showDiscard` | `signal<boolean>` | Discard pile visibility |
 | `showDeckBrowser` | `signal<boolean>` | Deck browser modal visibility |
 | `deckBrowserCards` | `signal<CardInstanceDto[]>` | Cards shown in deck browser |
+| `deckBrowserTopX` | `signal<number \| null>` | Filter to show only top X cards in deck browser |
+| `deckBrowserDraggedCard` | `signal<CardInstanceDto \| null>` | Currently dragged card in deck browser |
+| `deckBrowserDragOverIndex` | `signal<number \| null>` | Index of card being dragged over in deck browser |
 | `dragOverZone` | `signal<CardZone \| null>` | Current drag target zone |
 | `handMinimized` | `signal<boolean>` | Hand area minimized state |
 | `bottomControlsCollapsed` | `signal<boolean>` | Bottom controls collapsed |
 | `zoomCard` | `signal<CardInstanceDto \| null>` | Card being zoomed |
 | `arenaCardOrder` | `signal<{ [arena]: string[] }>` | Client-side custom card ordering |
+| `showOpponentHandModal` | `signal<string \| null>` | Username of opponent whose hand is being viewed |
 
 ### Chat & Bidding
 
@@ -100,6 +104,9 @@ The `room` signal is the single source of truth. Setting it triggers a cascade t
 | `opponentTeam` | `TeamDataDto \| null` | Opponent team (team mode only) |
 | `teammates` | `GamePlayerDto[]` | My teammates excluding self |
 | `opponentTeamPlayers` | `GamePlayerDto[]` | Players on the opponent team |
+| `opponentHandPlayer` | `GamePlayerDto \| null` | Opponent whose hand is being viewed in modal |
+| `myShowHandToOpponents` | `boolean` | Whether current player is sharing hand with opponents |
+| `opponentsWhoShareHand` | `GamePlayerDto[]` | Opponents who have enabled hand sharing |
 
 ### Team Arena Computed Signals
 
@@ -301,7 +308,31 @@ This ensures they work in both team mode and 1v1 mode.
 | `openDiscardCardMenu(event, card)` / `closeDiscardCardMenu()` | Discard card context menu |
 | `returnToHandFromDiscardMenu()` | Return card from discard to hand |
 | `openDeckBrowser()` | Fetch deck and show browser modal |
+| `openDeckBrowserTopX()` | Fetch deck and show browser modal filtered to top X |
 | `takeCardFromDeck(cardInstanceId)` | Take specific card from deck |
+| `onDeckCardDragStart(event, card)` | Start drag operation in deck browser |
+| `onDeckCardDragOver(event, targetIndex)` | Handle drag over in deck browser |
+| `onDeckCardDragLeave()` | Clear drag over state |
+| `onDeckCardDragEnd()` | Clean up drag state |
+| `onDeckCardDrop(event, targetCard)` | Handle drop to reorder deck (persists to server) |
+| `onDeckCardTouchDragStart(event, card)` | Start touch drag in deck browser |
+| `onDeckCardTouchDragMove(event)` | Handle touch drag move |
+| `onDeckCardTouchDrop(event, card)` | Handle touch drop to reorder deck |
+
+### Touch Event Handlers (iPad/Mobile)
+
+| Method | Description |
+|--------|-------------|
+| `onTouchLongPress(event, card, menuType)` | Handle long-press to open context menu. Menu types: `'card'` (arena card), `'stack'` (stacked card), `'hand'`, `'build'`, `'discard'`, `'opponent'` |
+| `openStackMenuFromTouch(event, card)` | Open stack menu from touch event |
+| `onTouchDragStart(event, card, zone)` | Start touch drag operation |
+| `onTouchDrop(event, card, sourceZone)` | Handle touch drop — move card or reorder within arena |
+
+**Touch Behavior:**
+- **Long-press (500ms)** on own card: Opens card menu (or stack menu if card has stacked cards)
+- **Long-press** on opponent card: Opens opponent menu (Zoom only)
+- **Drag** on own card: Moves card between zones
+- Uses `appTouchCard` directive for touch event handling
 
 ### Tap & Game Actions
 
@@ -388,6 +419,14 @@ This ensures they work in both team mode and 1v1 mode.
 | `attachEquipmentFromHandMenu(targetUnitId)` | Attach equipment from hand menu |
 | `attachEquipmentFromBuildMenu(targetUnitId)` | Attach equipment from build menu |
 | `detachEquipmentFromMenu()` | Detach equipment from menu |
+
+### Opponent Hand Sharing Methods
+
+| Method | Description |
+|--------|-------------|
+| `openOpponentHandModal(username)` | Open modal to view opponent's hand |
+| `closeOpponentHandModal()` | Close opponent hand modal |
+| `toggleShowHandToOpponents()` | Toggle sharing your hand with opponents |
 
 ### Utility Methods
 

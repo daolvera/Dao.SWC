@@ -92,6 +92,11 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     if (!id) return null;
     return this.deckBrowserCards().find(c => c.instanceId === id) ?? null;
   });
+
+  // Deck browser drag-and-drop state
+  deckBrowserDraggedCard = signal<CardInstanceDto | null>(null);
+  deckBrowserDragOverIndex = signal<number | null>(null);
+
   dragOverZone = signal<CardZone | null>(null);
   handMinimized = signal(false);
   bottomControlsCollapsed = signal(false);
@@ -225,12 +230,24 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   // Teammate hand modal state
   showTeammateHandModal = signal<string | null>(null); // username of teammate to show
 
+  // Opponent hand modal state
+  showOpponentHandModal = signal<string | null>(null); // username of opponent to show
+
   // Restart game state
   showRestartModal = signal(false);
   isRestartWaiting = signal(false);
-  restartValidDecks = signal<DeckListItemDto[]>([]);
+  allUserDecks = signal<DeckListItemDto[]>([]);
   restartDeckIdSelect = signal<number | null>(null);
   restartAlignmentSelect = signal<Alignment | null>(null);
+
+  // Filter decks by player's alignment (Light players see Light+Neutral, Dark see Dark+Neutral)
+  restartValidDecks = computed(() => {
+    const decks = this.allUserDecks().filter(d => d.isValid);
+    const myPlayer = this.myPlayer();
+    if (!myPlayer) return decks;
+    // Filter to only decks that match player's alignment or are neutral
+    return decks.filter(d => d.alignment === myPlayer.alignment || d.alignment === Alignment.Neutral);
+  });
 
   restartDeckIsNeutral = computed(() => {
     const id = this.restartDeckIdSelect();
@@ -245,6 +262,20 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     const username = this.showTeammateHandModal();
     if (!username) return null;
     return this.teammates().find((t) => t.username === username) ?? null;
+  });
+
+  opponentHandPlayer = computed(() => {
+    const username = this.showOpponentHandModal();
+    if (!username) return null;
+    return this.opponents().find((o) => o.username === username) ?? null;
+  });
+
+  myShowHandToOpponents = computed(() => {
+    return this.myPlayer()?.showHandToOpponents ?? false;
+  });
+
+  opponentsWhoShareHand = computed(() => {
+    return this.opponents().filter((o) => o.showHandToOpponents);
   });
 
   private draggedCard: DraggedCard | null = null;
@@ -426,7 +457,10 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   canStart = computed(() => {
     const r = this.room();
     if (!r) return false;
-    return r.players.length >= 2;
+    if (r.players.length < 2) return false;
+    // During restart, all players must have confirmed their deck
+    if (r.isRestarting && !r.players.every(p => p.hasConfirmedRestartDeck)) return false;
+    return true;
   });
 
   roomTypeBadgeClass = computed(() => {
@@ -591,10 +625,23 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.gameHub.roomUpdated$.subscribe((room) => {
         if (room.roomCode === this.roomCode) {
+          const prevRoom = this.room();
           this.room.set(room);
           // Clear restart-waiting flag once the game goes back in progress
           if (room.state === GameState.InProgress) {
             this.isRestartWaiting.set(false);
+          }
+          // When entering restart state, refresh deck list and initialize selection
+          if (room.isRestarting && (!prevRoom || !prevRoom.isRestarting)) {
+            // Refresh deck list to ensure we have current user's decks
+            this.deckService.getUserDecks().subscribe(decks => {
+              this.allUserDecks.set(decks);
+              // After decks are loaded, set the pre-selected deck
+              const myPlayer = room.players.find(p => p.username === this.gameHub.currentUser);
+              if (myPlayer && myPlayer.deckId > 0) {
+                this.restartDeckIdSelect.set(myPlayer.deckId);
+              }
+            });
           }
         }
       }),
@@ -618,7 +665,7 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         }, 0);
       }),
       this.deckService.getUserDecks().subscribe(decks =>
-        this.restartValidDecks.set(decks.filter(d => d.isValid))
+        this.allUserDecks.set(decks)
       ),
     );
 
@@ -1214,6 +1261,148 @@ export class GameRoomComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Deck browser drag-and-drop handlers
+  onDeckCardDragStart(event: DragEvent, card: CardInstanceDto): void {
+    this.deckBrowserDraggedCard.set(card);
+    event.dataTransfer?.setData('text/plain', card.instanceId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+    }
+  }
+
+  onDeckCardDragOver(event: DragEvent, targetIndex: number): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.deckBrowserDraggedCard()) {
+      this.deckBrowserDragOverIndex.set(targetIndex);
+    }
+  }
+
+  onDeckCardDragLeave(): void {
+    this.deckBrowserDragOverIndex.set(null);
+  }
+
+  onDeckCardDragEnd(): void {
+    this.deckBrowserDraggedCard.set(null);
+    this.deckBrowserDragOverIndex.set(null);
+  }
+
+  async onDeckCardDrop(event: DragEvent, targetCard: CardInstanceDto): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const draggedCard = this.deckBrowserDraggedCard();
+    if (!draggedCard || draggedCard.instanceId === targetCard.instanceId) {
+      this.onDeckCardDragEnd();
+      return;
+    }
+
+    const filteredCards = this.deckBrowserFiltered();
+    const fromIndex = filteredCards.findIndex(c => c.instanceId === draggedCard.instanceId);
+    const toIndex = filteredCards.findIndex(c => c.instanceId === targetCard.instanceId);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      this.onDeckCardDragEnd();
+      return;
+    }
+
+    // Create new order for the filtered cards
+    const newFilteredOrder = [...filteredCards];
+    newFilteredOrder.splice(fromIndex, 1);
+    newFilteredOrder.splice(toIndex, 0, draggedCard);
+
+    // Update local state immediately for responsive UI
+    const topX = this.deckBrowserTopX();
+    if (topX !== null && topX > 0) {
+      // If viewing top X, update only the top X cards and keep rest in original order
+      const allCards = this.deckBrowserCards();
+      const remainingCards = allCards.slice(topX);
+      this.deckBrowserCards.set([...newFilteredOrder, ...remainingCards]);
+    } else {
+      this.deckBrowserCards.set(newFilteredOrder);
+    }
+
+    this.onDeckCardDragEnd();
+
+    // Persist to server
+    const newOrderIds = newFilteredOrder.map(c => c.instanceId);
+    await this.gameHub.reorderDeck(newOrderIds);
+  }
+
+  // Deck browser touch drag-and-drop handlers
+  onDeckCardTouchDragStart(event: TouchDragEvent, card: CardInstanceDto): void {
+    this.deckBrowserDraggedCard.set(card);
+  }
+
+  onDeckCardTouchDragMove(event: TouchDragEvent): void {
+    if (!this.deckBrowserDraggedCard()) return;
+
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const cardElement = target?.closest('.game-card[data-deck-index]') as HTMLElement;
+    if (cardElement) {
+      const index = parseInt(cardElement.dataset['deckIndex'] ?? '-1', 10);
+      if (index >= 0) {
+        this.deckBrowserDragOverIndex.set(index);
+      }
+    } else {
+      this.deckBrowserDragOverIndex.set(null);
+    }
+  }
+
+  async onDeckCardTouchDrop(event: TouchDropEvent, card: CardInstanceDto): Promise<void> {
+    const draggedCard = this.deckBrowserDraggedCard();
+    if (!draggedCard) {
+      this.onDeckCardDragEnd();
+      return;
+    }
+
+    const target = event.dropTarget?.closest('.game-card[data-deck-index]') as HTMLElement;
+    if (!target) {
+      this.onDeckCardDragEnd();
+      return;
+    }
+
+    const targetIndex = parseInt(target.dataset['deckIndex'] ?? '-1', 10);
+    if (targetIndex < 0) {
+      this.onDeckCardDragEnd();
+      return;
+    }
+
+    const filteredCards = this.deckBrowserFiltered();
+    const targetCard = filteredCards[targetIndex];
+    if (!targetCard || targetCard.instanceId === draggedCard.instanceId) {
+      this.onDeckCardDragEnd();
+      return;
+    }
+
+    const fromIndex = filteredCards.findIndex(c => c.instanceId === draggedCard.instanceId);
+    if (fromIndex === -1) {
+      this.onDeckCardDragEnd();
+      return;
+    }
+
+    // Create new order for the filtered cards
+    const newFilteredOrder = [...filteredCards];
+    newFilteredOrder.splice(fromIndex, 1);
+    newFilteredOrder.splice(targetIndex, 0, draggedCard);
+
+    // Update local state immediately for responsive UI
+    const topX = this.deckBrowserTopX();
+    if (topX !== null && topX > 0) {
+      const allCards = this.deckBrowserCards();
+      const remainingCards = allCards.slice(topX);
+      this.deckBrowserCards.set([...newFilteredOrder, ...remainingCards]);
+    } else {
+      this.deckBrowserCards.set(newFilteredOrder);
+    }
+
+    this.onDeckCardDragEnd();
+
+    // Persist to server
+    const newOrderIds = newFilteredOrder.map(c => c.instanceId);
+    await this.gameHub.reorderDeck(newOrderIds);
+  }
+
   // Drag and drop
   onDragStart(event: DragEvent, card: CardInstanceDto, zone: CardZone): void {
     this.draggedCard = { card, sourceZone: zone };
@@ -1360,11 +1549,14 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   }
 
   // Touch event handlers for iPad/mobile support
-  onTouchLongPress(event: TouchDragEvent, card: CardInstanceDto, menuType: 'card' | 'hand' | 'build' | 'discard' | 'opponent'): void {
+  onTouchLongPress(event: TouchDragEvent, card: CardInstanceDto, menuType: 'card' | 'stack' | 'hand' | 'build' | 'discard' | 'opponent'): void {
     switch (menuType) {
       case 'card':
         this.cardMenuCardId.set(card.instanceId);
         this.setMenuPosition(event.clientX, event.clientY);
+        break;
+      case 'stack':
+        this.openStackMenuFromTouch(event, card);
         break;
       case 'hand':
         this.handCardMenuCardId.set(card.instanceId);
@@ -1373,17 +1565,64 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         break;
       case 'build':
         this.buildCardMenuCardId.set(card.instanceId);
-        this.setMenuPosition(event.clientX, event.clientY);
+        this.setBuildMenuPosition(event.clientX, event.clientY);
         break;
       case 'discard':
         this.discardCardMenuCardId.set(card.instanceId);
-        this.setMenuPosition(event.clientX, event.clientY);
+        this.setDiscardMenuPosition(event.clientX, event.clientY);
         break;
       case 'opponent':
         this.opponentCardMenuCard.set(card);
         this.setMenuPosition(event.clientX, event.clientY);
         break;
     }
+  }
+
+  private setBuildMenuPosition(x: number, y: number): void {
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const menuHeight = 300;
+    const menuWidth = 200;
+
+    let adjustedY = y;
+    if (y + menuHeight > viewportHeight) {
+      adjustedY = Math.max(10, viewportHeight - menuHeight - 10);
+    }
+
+    let adjustedX = x;
+    if (x + menuWidth > viewportWidth) {
+      adjustedX = Math.max(10, viewportWidth - menuWidth - 10);
+    }
+
+    this.buildCardMenuX.set(adjustedX);
+    this.buildCardMenuY.set(adjustedY);
+  }
+
+  private setDiscardMenuPosition(x: number, y: number): void {
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const menuHeight = 200;
+    const menuWidth = 200;
+
+    let adjustedY = y;
+    if (y + menuHeight > viewportHeight) {
+      adjustedY = Math.max(10, viewportHeight - menuHeight - 10);
+    }
+
+    let adjustedX = x;
+    if (x + menuWidth > viewportWidth) {
+      adjustedX = Math.max(10, viewportWidth - menuWidth - 10);
+    }
+
+    this.discardCardMenuX.set(adjustedX);
+    this.discardCardMenuY.set(adjustedY);
+  }
+
+  openStackMenuFromTouch(event: TouchDragEvent, card: CardInstanceDto): void {
+    this.stackMenuCardId.set(card.instanceId);
+    this.setMenuPosition(event.clientX, event.clientY, 400);
+    this.stackMenuX.set(this.cardMenuX());
+    this.stackMenuY.set(this.cardMenuY());
   }
 
   onTouchDragStart(event: TouchDragEvent, card: CardInstanceDto, zone: CardZone): void {
@@ -1982,6 +2221,19 @@ export class GameRoomComponent implements OnInit, OnDestroy {
 
   closeTeammateHandModal(): void {
     this.showTeammateHandModal.set(null);
+  }
+
+  // Opponent hand modal methods
+  openOpponentHandModal(username: string): void {
+    this.showOpponentHandModal.set(username);
+  }
+
+  closeOpponentHandModal(): void {
+    this.showOpponentHandModal.set(null);
+  }
+
+  toggleShowHandToOpponents(): void {
+    this.gameHub.toggleShowHandToOpponents();
   }
 
   // Equipment helpers
