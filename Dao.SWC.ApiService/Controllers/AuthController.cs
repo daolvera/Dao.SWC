@@ -111,8 +111,9 @@ public class AuthController(
         var email = result.Principal.FindFirstValue(ClaimTypes.Email);
         var name = result.Principal.FindFirstValue(ClaimTypes.Name);
 
+        // when deployed the app and api will be on the same domain, so just redirect to the root.
         string applicationBaseUrl =
-            Configuration[Constants.AppUrlConfigurationKey] ?? string.Empty;
+            Configuration[Constants.AppUrlConfigurationKey] ?? "/";
         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
         {
             return Redirect($"{applicationBaseUrl}/auth/error?message=missing_claims");
