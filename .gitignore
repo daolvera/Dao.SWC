@@ -365,3 +365,4 @@ FodyWeavers.xsd
 /Dao.SWC.Web/.playwright-mcp
 /Decks
 **/package-lock.json
+!Dao.SWC.Web/package-lock.json

@@ -1549,7 +1549,12 @@ export class GameRoomComponent implements OnInit, OnDestroy {
   }
 
   // Touch event handlers for iPad/mobile support
-  onTouchLongPress(event: TouchDragEvent, card: CardInstanceDto, menuType: 'card' | 'stack' | 'hand' | 'build' | 'discard' | 'opponent'): void {
+  onTouchLongPress(
+    event: TouchDragEvent,
+    card: CardInstanceDto,
+    menuType: 'card' | 'stack' | 'hand' | 'build' | 'discard' | 'opponent' | 'pilot' | 'equipment' | 'deck',
+    parentCard?: CardInstanceDto,
+  ): void {
     switch (menuType) {
       case 'card':
         this.cardMenuCardId.set(card.instanceId);
@@ -1573,6 +1578,26 @@ export class GameRoomComponent implements OnInit, OnDestroy {
         break;
       case 'opponent':
         this.opponentCardMenuCard.set(card);
+        this.setMenuPosition(event.clientX, event.clientY);
+        break;
+      case 'pilot':
+        if (parentCard) {
+          this.pilotMenuCardId.set(card.instanceId);
+          this.pilotMenuUnitCard.set(parentCard);
+          this.pilotMenuX.set(event.clientX);
+          this.pilotMenuY.set(event.clientY);
+        }
+        break;
+      case 'equipment':
+        if (parentCard) {
+          this.equipmentMenuCardId.set(card.instanceId);
+          this.equipmentMenuUnitCard.set(parentCard);
+          this.equipmentMenuX.set(event.clientX);
+          this.equipmentMenuY.set(event.clientY);
+        }
+        break;
+      case 'deck':
+        this.deckCardMenuCardId.set(card.instanceId);
         this.setMenuPosition(event.clientX, event.clientY);
         break;
     }

@@ -249,6 +249,9 @@
                               <div
                                 class="game-card small pilot-card"
                                 (dblclick)="zoomCard.set(pilotCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(pilotCard)"
                               >
                                 <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
@@ -258,6 +261,9 @@
                               <div
                                 class="game-card small equipment-card"
                                 (dblclick)="zoomCard.set(equipCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(equipCard)"
                               >
                                 <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                               </div>
@@ -385,6 +391,9 @@
                               <div
                                 class="game-card small pilot-card"
                                 (dblclick)="zoomCard.set(pilotCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(pilotCard)"
                               >
                                 <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
@@ -394,6 +403,9 @@
                               <div
                                 class="game-card small equipment-card"
                                 (dblclick)="zoomCard.set(equipCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(equipCard)"
                               >
                                 <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                               </div>
@@ -521,6 +533,9 @@
                               <div
                                 class="game-card small pilot-card"
                                 (dblclick)="zoomCard.set(pilotCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(pilotCard)"
                               >
                                 <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
@@ -530,6 +545,9 @@
                               <div
                                 class="game-card small equipment-card"
                                 (dblclick)="zoomCard.set(equipCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(equipCard)"
                               >
                                 <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                               </div>
@@ -655,6 +673,9 @@
                               <div
                                 class="game-card small pilot-card"
                                 (dblclick)="zoomCard.set(pilotCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(pilotCard)"
                               >
                                 <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
@@ -664,6 +685,9 @@
                               <div
                                 class="game-card small equipment-card"
                                 (dblclick)="zoomCard.set(equipCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(equipCard)"
                               >
                                 <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                               </div>
@@ -781,6 +805,9 @@
                               <div
                                 class="game-card small pilot-card"
                                 (dblclick)="zoomCard.set(pilotCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(pilotCard)"
                               >
                                 <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
@@ -790,6 +817,9 @@
                               <div
                                 class="game-card small equipment-card"
                                 (dblclick)="zoomCard.set(equipCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(equipCard)"
                               >
                                 <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                               </div>
@@ -907,6 +937,9 @@
                               <div
                                 class="game-card small pilot-card"
                                 (dblclick)="zoomCard.set(pilotCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(pilotCard)"
                               >
                                 <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                               </div>
@@ -916,6 +949,9 @@
                               <div
                                 class="game-card small equipment-card"
                                 (dblclick)="zoomCard.set(equipCard)"
+                              appTouchCard
+                                [touchDraggable]="false"
+                                (longPress)="zoomCard.set(equipCard)"
                               >
                                 <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                               </div>
@@ -1058,6 +1094,9 @@
                               class="game-card small pilot-card"
                               (dblclick)="zoomCard.set(pilotCard)"
                               (contextmenu)="openPilotCardMenu($event, pilotCard, card)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, pilotCard, 'pilot', card)"
                             >
                               <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                             </div>
@@ -1068,6 +1107,9 @@
                               class="game-card small equipment-card"
                               (dblclick)="zoomCard.set(equipCard)"
                               (contextmenu)="openEquipmentCardMenu($event, equipCard, card)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, equipCard, 'equipment', card)"
                             >
                               <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                             </div>
@@ -1137,6 +1179,9 @@
                               [class.tapped]="stackedCard.isTapped"
                               [class.face-down]="stackedCard.isFaceDown"
                               (dblclick)="zoomCard.set(stackedCard)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="zoomCard.set(stackedCard)"
                             >
                               <img
                                 [src]="
@@ -1227,6 +1272,9 @@
                               class="game-card small pilot-card"
                               (dblclick)="zoomCard.set(pilotCard)"
                               (contextmenu)="openPilotCardMenu($event, pilotCard, card)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, pilotCard, 'pilot', card)"
                             >
                               <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                             </div>
@@ -1237,6 +1285,9 @@
                               class="game-card small equipment-card"
                               (dblclick)="zoomCard.set(equipCard)"
                               (contextmenu)="openEquipmentCardMenu($event, equipCard, card)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, equipCard, 'equipment', card)"
                             >
                               <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                             </div>
@@ -1309,6 +1360,9 @@
                               [class.tapped]="stackedCard.isTapped"
                               [class.face-down]="stackedCard.isFaceDown"
                               (dblclick)="zoomCard.set(stackedCard)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="zoomCard.set(stackedCard)"
                             >
                               <img
                                 [src]="
@@ -1399,6 +1453,9 @@
                               class="game-card small pilot-card"
                               (dblclick)="zoomCard.set(pilotCard)"
                               (contextmenu)="openPilotCardMenu($event, pilotCard, card)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, pilotCard, 'pilot', card)"
                             >
                               <img [src]="pilotCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="pilotCard.cardName" />
                             </div>
@@ -1409,6 +1466,9 @@
                               class="game-card small equipment-card"
                               (dblclick)="zoomCard.set(equipCard)"
                               (contextmenu)="openEquipmentCardMenu($event, equipCard, card)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="onTouchLongPress($event, equipCard, 'equipment', card)"
                             >
                               <img [src]="equipCard.cardImageUrl || 'assets/card-back.jpg'" [alt]="equipCard.cardName" />
                             </div>
@@ -1481,6 +1541,9 @@
                               [class.tapped]="stackedCard.isTapped"
                               [class.face-down]="stackedCard.isFaceDown"
                               (dblclick)="zoomCard.set(stackedCard)"
+                            appTouchCard
+                              [touchDraggable]="false"
+                              (longPress)="zoomCard.set(stackedCard)"
                             >
                               <img
                                 [src]="
@@ -1826,6 +1889,7 @@
                     [title]="'Click to take ' + card.cardName + ' to hand, drag to reorder'"
                     appTouchCard
                     [touchDraggable]="true"
+                    (longPress)="onTouchLongPress($event, card, 'deck')"
                     (touchDragStart)="onDeckCardTouchDragStart($event, card)"
                     (touchDragMove)="onDeckCardTouchDragMove($event)"
                     (touchDragEnd)="onDeckCardTouchDrop($event, card)"

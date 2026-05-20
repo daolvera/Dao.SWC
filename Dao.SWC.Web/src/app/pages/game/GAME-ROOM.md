@@ -323,7 +323,7 @@ This ensures they work in both team mode and 1v1 mode.
 
 | Method | Description |
 |--------|-------------|
-| `onTouchLongPress(event, card, menuType)` | Handle long-press to open context menu. Menu types: `'card'` (arena card), `'stack'` (stacked card), `'hand'`, `'build'`, `'discard'`, `'opponent'` |
+| `onTouchLongPress(event, card, menuType, parentCard?)` | Handle long-press to open context menu. Menu types: `'card'` (arena card), `'stack'` (stacked card), `'hand'`, `'build'`, `'discard'`, `'opponent'`, `'pilot'`, `'equipment'`, `'deck'`. The optional `parentCard` parameter is used for `'pilot'` and `'equipment'` types to reference the unit card. |
 | `openStackMenuFromTouch(event, card)` | Open stack menu from touch event |
 | `onTouchDragStart(event, card, zone)` | Start touch drag operation |
 | `onTouchDrop(event, card, sourceZone)` | Handle touch drop — move card or reorder within arena |
@@ -331,6 +331,10 @@ This ensures they work in both team mode and 1v1 mode.
 **Touch Behavior:**
 - **Long-press (500ms)** on own card: Opens card menu (or stack menu if card has stacked cards)
 - **Long-press** on opponent card: Opens opponent menu (Zoom only)
+- **Long-press** on pilot card: Opens pilot menu (own) or zooms (opponent)
+- **Long-press** on equipment card: Opens equipment menu (own) or zooms (opponent)
+- **Long-press** on stacked card: Zooms the card
+- **Long-press** on deck browser card: Opens deck card menu
 - **Drag** on own card: Moves card between zones
 - Uses `appTouchCard` directive for touch event handling
 
