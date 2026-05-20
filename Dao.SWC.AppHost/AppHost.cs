@@ -1,3 +1,4 @@
+using Azure.Provisioning.Sql;
 using Dao.SWC.Core;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -13,7 +14,9 @@ if (builder.ExecutionContext.IsPublishMode)
             // Codify BillOverUsage so azd provision doesn't revert it to AutoPause
             foreach (var db in infra.GetProvisionableResources().OfType<Azure.Provisioning.Sql.SqlDatabase>())
             {
-                db.FreeLimitExhaustionBehavior = Azure.Provisioning.Sql.FreeLimitExhaustionBehavior.BillOverUsage;
+                var sqlDb = infra.GetProvisionableResources().OfType<SqlDatabase>().Single();
+                sqlDb.Sku = new SqlSku { Name = "Basic", Tier = "Basic", Capacity = 5 };
+                sqlDb.UseFreeLimit = false;
             }
         });
     swcDb = azureSql.AddDatabase(Constants.ProjectNames.Database);
